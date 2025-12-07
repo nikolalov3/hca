@@ -111,6 +111,5 @@ async def reset_webhook():
 
 
 from fastapi.staticfiles import StaticFiles
-app.mount("/", StaticFiles(directory=str(Path(__file__).parent.parent / "basket_bot_frontend" / "build"), html=True), name="static"")
-
+app.mount("/", StaticFiles(directory=str(Path(__file__).parent.parent / "basket_bot_frontend" / "build"), html=True), name="static")
     uvicorn.run(app, host="0.0.0.0", port=PORT)
