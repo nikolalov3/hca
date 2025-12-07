@@ -3,49 +3,37 @@ from dotenv import load_dotenv
 from telegram import Update, WebAppInfo, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 from fastapi import FastAPI
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, HTMLResponse
 import uvicorn
-from pathlib import Path
 
 load_dotenv()
 
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 WEBAPP_URL = os.getenv("WEBAPP_URL")
-WEBHOOK_URL = os.getenv("WEBHOOK_URL")  # np. https://twoja-domena.railway.app
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 PORT = 8080
 
 app = FastAPI()
-application = None  # Global variable to store the bot application
+application = None
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [
-        [InlineKeyboardButton("💳 Otwórz aplikację", web_app=WebAppInfo(url=WEBAPP_URL))]
-    ]
+    keyboard = [[InlineKeyboardButton("Open App", web_app=WebAppInfo(url=WEBAPP_URL))]]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text(
-        "Oto twoja aplikacja! Kliknij poniżej aby ją otworzyć:",
-        reply_markup=reply_markup
-    )
+    await update.message.reply_text("Click button to open:", reply_markup=reply_markup)
+
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    help_text = (
-        "Dostępne komendy:\n"
-        "/start - Otwórz aplikację\n"
-        "/help - Wyświetl tę wiadomość"
-    )
+    help_text = "/start - Open app\n/help - Show this message"
     await update.message.reply_text(help_text)
 
 
 async def init_bot():
-    """Initialize the Telegram bot application"""
     global application
-    
     application = ApplicationBuilder().token(TOKEN).build()
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
     
-    # Ustaw webhook
     if WEBHOOK_URL:
         await application.bot.delete_webhook(drop_pending_updates=True)
         await application.bot.set_webhook(url=f"{WEBHOOK_URL}/webhook")
@@ -59,14 +47,13 @@ async def init_bot():
 async def startup():
     global application
     application = await init_bot()
-    print(f"Bot has been started! Webhook: {WEBHOOK_URL}/webhook")
+    print(f"Bot started! Webhook: {WEBHOOK_URL}/webhook")
 
 
 @app.on_event("shutdown")
 async def shutdown():
-    global application
-    if application:
-            pass
+    pass
+
 
 @app.post("/webhook")
 async def webhook(update: dict):
@@ -76,7 +63,7 @@ async def webhook(update: dict):
             telegram_update = Update.de_json(update, application.bot)
             await application.process_update(telegram_update)
         except Exception as e:
-            print(f"Error processing update: {e}")
+            print(f"Error: {e}")
     return JSONResponse({"ok": True})
 
 
@@ -85,33 +72,28 @@ async def health():
     return {"status": "ok"}
 
 
-@app.get("/reset-webhook")
+@app.post("/reset-webhook")
 async def reset_webhook():
-    """Force reset webhook to Railway URL - use this to migrate from ngrok"""
     global application
     if application and WEBHOOK_URL:
         try:
-            # Delete old webhook first
             await application.bot.delete_webhook(drop_pending_updates=False)
-            # Set new webhook
             await application.bot.set_webhook(url=f"{WEBHOOK_URL}/webhook")
             webhook_info = await application.bot.get_webhook_info()
             return {
                 "status": "success",
-                "message": "Webhook reset successfully",
+                "message": "Webhook reset",
                 "webhook_url": webhook_info.url,
                 "pending_updates": webhook_info.pending_update_count
             }
         except Exception as e:
             return {"status": "error", "message": str(e)}
-    return {"error": "application not initialized or WEBHOOK_URL not set"}
-
-
+    return {"error": "Not initialized"}
 
 
 @app.get("/")
 async def root():
-    html = """
+    html_content = """
     <!DOCTYPE html>
     <html lang="pl">
     <head>
@@ -137,19 +119,19 @@ async def root():
     <body>
         <div class="container">
             <h1>Basket Bot</h1>
-            <p>Telegram bot application</p>
+            <p>Telegram Application</p>
             
             <div class="status">
-                <div class="status-title">System Status</div>
+                <div class="status-title">Status</div>
                 <div class="status-item">Backend: Online</div>
-                <div class="status-item" id="telegram-status">Telegram: Waiting</div>
+                <div class="status-item" id="tg-status">Telegram: Waiting</div>
                 <div class="status-item" id="user-status">User: Not connected</div>
             </div>
             
-            <button class="btn-primary" onclick="openApp()">Open Application</button>
+            <button class="btn-primary" onclick="openApp()">Open App</button>
             <button class="btn-secondary" onclick="resetWebhook()">Reset Webhook</button>
             
-            <p style="text-align: center; color: #999; font-size: 12px; margin-top: 30px;">Basket Bot v1.0 | Railway Deployment</p>
+            <p style="text-align: center; color: #999; font-size: 12px; margin-top: 30px;">Basket Bot v1.0</p>
         </div>
 
         <script>
@@ -157,8 +139,7 @@ async def root():
                 if (window.Telegram && window.Telegram.WebApp) {
                     var tg = window.Telegram.WebApp;
                     tg.ready();
-                    document.getElementById('telegram-status').textContent = 'Telegram: Connected';
-                    
+                    document.getElementById('tg-status').textContent = 'Telegram: Connected';
                     if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
                         var user = tg.initDataUnsafe.user;
                         document.getElementById('user-status').textContent = 'User: ' + (user.first_name || 'Unknown');
@@ -176,14 +157,13 @@ async def root():
                 fetch('/reset-webhook', { method: 'POST' })
                     .then(function(response) {
                         if (response.ok) {
-                            alert('Webhook reset successfully!');
+                            alert('Webhook reset!');
                         } else {
-                            alert('Error resetting webhook');
+                            alert('Error');
                         }
                     })
                     .catch(function(error) {
-                        console.error('Error:', error);
-                        alert('Failed to reset webhook');
+                        alert('Failed');
                     });
             }
 
@@ -193,8 +173,8 @@ async def root():
     </body>
     </html>
     """
-    from fastapi.responses import HTMLResponse
-    return HTMLResponse(content=html)
+    return HTMLResponse(content=html_content)
 
 
-uvicorn.run(app, host="0.0.0.0", port=PORT)
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=PORT)
