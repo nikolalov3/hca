@@ -108,6 +108,9 @@ async def reset_webhook():
     return {"error": "application not initialized or WEBHOOK_URL not set"}
 
 
-            
+
+
+from fastapi.staticfiles import StaticFiles
+app.mount("/", StaticFiles(directory="../basket_bot_frontend/build", html=True), name="static")
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=PORT)
