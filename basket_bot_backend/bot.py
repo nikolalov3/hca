@@ -33,7 +33,7 @@ async def main():
     
     
     if WEBHOOK_URL:
-                    await application.bot.delete_webhook(drop_pending_updates=True)
+                await application.bot.delete_webhook(drop_pending_updates=True)
         await application.bot.set_webhook(url=f"{WEBHOOK_URL}/webhook")
     
     return application
