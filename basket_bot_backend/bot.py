@@ -1,10 +1,12 @@
+import os
+from dotenv import load_dotenv
 from telegram import Update, WebAppInfo, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
-# WKLEJ SWÓJ PRAWDZIWY TOKEN PONIŻEJ (w cudzysłowie)
-TOKEN = "8353950120:AAExoG7jNlgLaM3ngovzCwVOyY8bLsG0deU" 
-# To jest Twój adres z ngroka (ze zdjęcia)
-WEBAPP_URL = "https://rae-beachless-zane.ngrok-free.dev"
+load_dotenv()
+
+TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+WEBAPP_URL = os.getenv("WEBAPP_URL")
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
@@ -22,4 +24,3 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler("start", start))
     print("Bot wystartował! Czeka na wiadomości...")
     app.run_polling()
-
