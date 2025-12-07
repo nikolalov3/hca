@@ -16,17 +16,14 @@ PORT = 8080
 app = FastAPI()
 application = None
 
-
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [[InlineKeyboardButton("Open App", web_app=WebAppInfo(url=WEBAPP_URL))]]
+    keyboard = [[InlineKeyboardButton("Otworz aplikacje", web_app=WebAppInfo(url=WEBAPP_URL))]]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text("Click button to open:", reply_markup=reply_markup)
-
+    await update.message.reply_text("Klikni przycisk poniżej aby otworzyć aplikację:", reply_markup=reply_markup)
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    help_text = "/start - Open app\n/help - Show this message"
+    help_text = "/start - Otwórz aplikację\\n/help - Pokaż tę wiadomość"
     await update.message.reply_text(help_text)
-
 
 async def init_bot():
     global application
@@ -37,23 +34,20 @@ async def init_bot():
     if WEBHOOK_URL:
         await application.bot.delete_webhook(drop_pending_updates=True)
         await application.bot.set_webhook(url=f"{WEBHOOK_URL}/webhook")
-        print(f"Bot webhook set to: {WEBHOOK_URL}/webhook")
+        print(f"Bot webhook ustawiony na: {WEBHOOK_URL}/webhook")
     
     await application.initialize()
     return application
-
 
 @app.on_event("startup")
 async def startup():
     global application
     application = await init_bot()
-    print(f"Bot started! Webhook: {WEBHOOK_URL}/webhook")
-
+    print(f"Bot uruchomiony! Webhook: {WEBHOOK_URL}/webhook")
 
 @app.on_event("shutdown")
 async def shutdown():
     pass
-
 
 @app.post("/webhook")
 async def webhook(update: dict):
@@ -63,33 +57,12 @@ async def webhook(update: dict):
             telegram_update = Update.de_json(update, application.bot)
             await application.process_update(telegram_update)
         except Exception as e:
-            print(f"Error: {e}")
+            print(f"Blad: {e}")
     return JSONResponse({"ok": True})
-
 
 @app.get("/health")
 async def health():
     return {"status": "ok"}
-
-
-@app.post("/reset-webhook")
-async def reset_webhook():
-    global application
-    if application and WEBHOOK_URL:
-        try:
-            await application.bot.delete_webhook(drop_pending_updates=False)
-            await application.bot.set_webhook(url=f"{WEBHOOK_URL}/webhook")
-            webhook_info = await application.bot.get_webhook_info()
-            return {
-                "status": "success",
-                "message": "Webhook reset",
-                "webhook_url": webhook_info.url,
-                "pending_updates": webhook_info.pending_update_count
-            }
-        except Exception as e:
-            return {"status": "error", "message": str(e)}
-    return {"error": "Not initialized"}
-
 
 @app.get("/")
 async def root():
@@ -99,74 +72,211 @@ async def root():
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Basket Bot</title>
+        <title>Hoop Connect - Koszyk</title>
         <script src="https://telegram.org/js/telegram-web-app.js"></script>
         <style>
-            body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f0f0f0; }
-            .container { max-width: 500px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-            h1 { color: #333; text-align: center; margin-top: 0; }
-            p { color: #666; text-align: center; }
-            .status { background: #f9f9f9; padding: 15px; border-left: 4px solid #667eea; margin: 20px 0; }
-            .status-title { font-weight: bold; margin-bottom: 10px; }
-            .status-item { margin: 8px 0; font-size: 14px; }
-            button { padding: 10px 20px; margin: 10px 0; width: 100%; border: none; border-radius: 5px; cursor: pointer; font-size: 14px; font-weight: bold; }
-            .btn-primary { background: #667eea; color: white; }
-            .btn-primary:hover { background: #5568d3; }
-            .btn-secondary { background: #e0e0e0; color: #333; }
-            .btn-secondary:hover { background: #d0d0d0; }
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+            body {
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                min-height: 100vh;
+                display: flex;
+                flex-direction: column;
+            }
+            .header {
+                background: rgba(255, 255, 255, 0.95);
+                padding: 20px;
+                border-bottom: 2px solid #667eea;
+                text-align: center;
+                box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            }
+            .header h1 {
+                color: #667eea;
+                font-size: 28px;
+                margin-bottom: 5px;
+            }
+            .header p {
+                color: #999;
+                font-size: 14px;
+            }
+            .container {
+                flex: 1;
+                overflow-y: auto;
+                padding: 20px;
+            }
+            .product-card {
+                background: white;
+                border-radius: 12px;
+                padding: 15px;
+                margin-bottom: 15px;
+                box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+            .product-info h3 {
+                color: #333;
+                font-size: 16px;
+                margin-bottom: 5px;
+            }
+            .product-info p {
+                color: #999;
+                font-size: 13px;
+            }
+            .product-price {
+                color: #667eea;
+                font-weight: bold;
+                font-size: 18px;
+            }
+            .cart-info {
+                background: rgba(255, 255, 255, 0.95);
+                padding: 20px;
+                border-radius: 12px;
+                margin-bottom: 15px;
+                text-align: center;
+            }
+            .cart-total {
+                font-size: 24px;
+                color: #667eea;
+                font-weight: bold;
+                margin: 10px 0;
+            }
+            .button-group {
+                display: flex;
+                gap: 10px;
+                padding: 20px;
+                background: rgba(255, 255, 255, 0.95);
+                border-top: 2px solid #667eea;
+            }
+            button {
+                flex: 1;
+                padding: 15px;
+                border: none;
+                border-radius: 8px;
+                font-size: 16px;
+                font-weight: bold;
+                cursor: pointer;
+                transition: all 0.3s ease;
+            }
+            .btn-add {
+                background: #667eea;
+                color: white;
+            }
+            .btn-add:active {
+                background: #5568d3;
+                transform: scale(0.98);
+            }
+            .btn-checkout {
+                background: #48bb78;
+                color: white;
+            }
+            .btn-checkout:active {
+                background: #38a169;
+                transform: scale(0.98);
+            }
+            .empty-cart {
+                text-align: center;
+                color: white;
+                padding: 40px;
+            }
+            .empty-cart svg {
+                width: 80px;
+                height: 80px;
+                margin-bottom: 20px;
+                opacity: 0.8;
+            }
         </style>
     </head>
     <body>
+        <div class="header">
+            <h1>Hoop Connect</h1>
+            <p>Aplikacja handlowa</p>
+        </div>
+        
         <div class="container">
-            <h1>Basket Bot</h1>
-            <p>Telegram Application</p>
-            
-            <div class="status">
-                <div class="status-title">Status</div>
-                <div class="status-item">Backend: Online</div>
-                <div class="status-item" id="tg-status">Telegram: Waiting</div>
-                <div class="status-item" id="user-status">User: Not connected</div>
+            <div class="cart-info">
+                <p>Twoj Koszyk</p>
+                <div class="cart-total" id="cart-total">0 PLN</div>
+                <p style="color: #999; font-size: 12px;" id="cart-items">0 produktów</p>
             </div>
             
-            <button class="btn-primary" onclick="openApp()">Open App</button>
-            <button class="btn-secondary" onclick="resetWebhook()">Reset Webhook</button>
-            
-            <p style="text-align: center; color: #999; font-size: 12px; margin-top: 30px;">Basket Bot v1.0</p>
+            <div id="products-list">
+                <div class="product-card">
+                    <div class="product-info">
+                        <h3>Produkt 1</h3>
+                        <p>Wysokiej jakosci towar</p>
+                    </div>
+                    <div style="text-align: right;">
+                        <div class="product-price">49.99 PLN</div>
+                        <button class="btn-add" onclick="addToCart('Produkt 1', 49.99)">Dodaj</button>
+                    </div>
+                </div>
+                
+                <div class="product-card">
+                    <div class="product-info">
+                        <h3>Produkt 2</h3>
+                        <p>Premium wersja</p>
+                    </div>
+                    <div style="text-align: right;">
+                        <div class="product-price">79.99 PLN</div>
+                        <button class="btn-add" onclick="addToCart('Produkt 2', 79.99)">Dodaj</button>
+                    </div>
+                </div>
+                
+                <div class="product-card">
+                    <div class="product-info">
+                        <h3>Produkt 3</h3>
+                        <p>Specjalna oferta</p>
+                    </div>
+                    <div style="text-align: right;">
+                        <div class="product-price">29.99 PLN</div>
+                        <button class="btn-add" onclick="addToCart('Produkt 3', 29.99)">Dodaj</button>
+                    </div>
+                </div>
+            </div>
         </div>
-
+        
+        <div class="button-group">
+            <button class="btn-checkout" onclick="checkout()">Zakoncz Zakupy</button>
+        </div>
+        
         <script>
+            let cart = [];
+            
             function initTelegram() {
                 if (window.Telegram && window.Telegram.WebApp) {
-                    var tg = window.Telegram.WebApp;
-                    tg.ready();
-                    document.getElementById('tg-status').textContent = 'Telegram: Connected';
-                    if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
-                        var user = tg.initDataUnsafe.user;
-                        document.getElementById('user-status').textContent = 'User: ' + (user.first_name || 'Unknown');
-                    }
-                }
-            }
-
-            function openApp() {
-                if (window.Telegram && window.Telegram.WebApp) {
+                    window.Telegram.WebApp.ready();
                     window.Telegram.WebApp.expand();
                 }
             }
-
-            function resetWebhook() {
-                fetch('/reset-webhook', { method: 'POST' })
-                    .then(function(response) {
-                        if (response.ok) {
-                            alert('Webhook reset!');
-                        } else {
-                            alert('Error');
-                        }
-                    })
-                    .catch(function(error) {
-                        alert('Failed');
-                    });
+            
+            function addToCart(name, price) {
+                cart.push({ name: name, price: price });
+                updateCart();
             }
-
+            
+            function updateCart() {
+                const total = cart.reduce((sum, item) => sum + item.price, 0).toFixed(2);
+                document.getElementById('cart-total').textContent = total + ' PLN';
+                document.getElementById('cart-items').textContent = cart.length + ' produktów';
+            }
+            
+            function checkout() {
+                if (cart.length === 0) {
+                    alert('Dodaj produkty do koszyka!');
+                    return;
+                }
+                const total = cart.reduce((sum, item) => sum + item.price, 0).toFixed(2);
+                const message = 'Zamowienie: ' + cart.map(item => item.name).join(', ') + ' - Suma: ' + total + ' PLN';
+                if (window.Telegram && window.Telegram.WebApp) {
+                    window.Telegram.WebApp.sendData(message);
+                }
+            }
+            
             window.addEventListener('load', initTelegram);
             initTelegram();
         </script>
@@ -174,7 +284,6 @@ async def root():
     </html>
     """
     return HTMLResponse(content=html_content)
-
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=PORT)
