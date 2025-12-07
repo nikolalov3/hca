@@ -110,7 +110,7 @@ async def reset_webhook():
 
 
 # Mount React static files
-BUILD_PATH = os.path.join(os.path.dirname(__file__), '..', 'basket_bot_frontend', 'build')
+= os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'basket_bot_frontend', 'build')
 if os.path.exists(BUILD_PATH):
     app.mount('/static', StaticFiles(directory=os.path.join(BUILD_PATH, 'static')), name='static')
 
