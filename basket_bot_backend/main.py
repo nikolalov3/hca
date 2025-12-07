@@ -52,8 +52,7 @@ async def get_profile(telegram_id: int, db: AsyncSession = Depends(get_db)):
 
 # Zapisywanie profilu
 @app.post("/api/profile")
-async def update_profile( UserProfileUpdate, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(User).where(User.telegram_id == data.telegram_id))
+async def update_profile(data: UserProfileUpdate, db: AsyncSession = Depends(get_db)):    result = await db.execute(select(User).where(User.telegram_id == data.telegram_id))
     user = result.scalar_one_or_none()
 
     if not user:
