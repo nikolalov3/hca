@@ -27,6 +27,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=reply_markup
     )
 
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    help_text = (
+        "Dostępne komendy:\n"
+        "/start - Otwórz aplikację\n"
+        "/help - Wyświetl tę wiadomość"
+    )
+    await update.message.reply_text(help_text)
+
 
 async def init_bot():
     """Initialize the Telegram bot application"""
@@ -34,6 +42,7 @@ async def init_bot():
     
     application = ApplicationBuilder().token(TOKEN).build()
     application.add_handler(CommandHandler("start", start))
+        application.add_handler(CommandHandler("help", help_command))
     
     # Ustaw webhook
     if WEBHOOK_URL:
