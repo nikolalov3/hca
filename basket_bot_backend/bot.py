@@ -1,289 +1,383 @@
 import os
-from dotenv import load_dotenv
-from telegram import Update, WebAppInfo, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
-from fastapi import FastAPI
-from fastapi.responses import JSONResponse, HTMLResponse
+import asyncio
+import json
+import logging
+from datetime import datetime, timedelta
+from typing import Optional, Dict, List
+from enum import Enum
+
+from fastapi import FastAPI, Request, HTTPException
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse, JSONResponse
+from contextlib import asynccontextmanager
+import aiohttp
 import uvicorn
 
-load_dotenv()
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-TOKEN = os.getenv("8353950120:AAExoG7jNlgLaM3ngovzCwVOyY8bLsG0deU")
-WEBAPP_URL = os.getenv("https://hca-production.up.railway.app")
+TELEGRAM_BOT_TOKEN = os.getenv("8353950120:AAExoG7jNlgLaM3ngovzCwVOyY8bLsG0deU")
 WEBHOOK_URL = os.getenv("https://hca-production.up.railway.app")
-PORT = 8080
+WEBAPP_URL = os.getenv("https://hca-production.up.railway.app")
 
-app = FastAPI()
-application = None
+if not all([TELEGRAM_BOT_TOKEN, WEBHOOK_URL, WEBAPP_URL]):
+    raise ValueError("Missing required environment variables: TELEGRAM_BOT_TOKEN, WEBHOOK_URL, WEBAPP_URL")
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [[InlineKeyboardButton("Otworz aplikacje", web_app=WebAppInfo(url=WEBAPP_URL))]]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text("Klikni przycisk poniżej aby otworzyć aplikację:", reply_markup=reply_markup)
+TELEGRAM_API_URL = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
 
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    help_text = "/start - Otwórz aplikację\\n/help - Pokaż tę wiadomość"
-    await update.message.reply_text(help_text)
+class CourtStatus(str, Enum):
+    AVAILABLE = "dostępna"
+    BOOKED = "zarezerwowana"
+    MAINTENANCE = "konserwacja"
 
-async def init_bot():
-    global application
-    application = ApplicationBuilder().token(TOKEN).build()
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("help", help_command))
+class UserSession:
+    def __init__(self):
+        self.users: Dict[int, dict] = {}
     
-    if WEBHOOK_URL:
-        await application.bot.delete_webhook(drop_pending_updates=True)
-        await application.bot.set_webhook(url=f"{WEBHOOK_URL}/webhook")
-        print(f"Bot webhook ustawiony na: {WEBHOOK_URL}/webhook")
+    def get_user(self, user_id: int):
+        if user_id not in self.users:
+            self.users[user_id] = {
+                "wallet_connected": False,
+                "wallet_address": None,
+                "reservations": [],
+                "state": "main_menu"
+            }
+        return self.users[user_id]
     
-    await application.initialize()
-    return application
+    def update_user(self, user_id: int, **kwargs):
+        user = self.get_user(user_id)
+        user.update(kwargs)
 
-@app.on_event("startup")
-async def startup():
-    global application
-    application = await init_bot()
-    print(f"Bot uruchomiony! Webhook: {WEBHOOK_URL}/webhook")
+sessions = UserSession()
 
-@app.on_event("shutdown")
-async def shutdown():
-    pass
+# Mock database for courts
+COURTS_DB = {
+    "1": {
+        "id": "1",
+        "name": "Boisko 1",
+        "status": CourtStatus.AVAILABLE,
+        "price_per_hour": 50,
+        "bookings": []
+    },
+    "2": {
+        "id": "2",
+        "name": "Boisko 2",
+        "status": CourtStatus.AVAILABLE,
+        "price_per_hour": 60,
+        "bookings": []
+    },
+    "3": {
+        "id": "3",
+        "name": "Boisko 3",
+        "status": CourtStatus.AVAILABLE,
+        "price_per_hour": 55,
+        "bookings": []
+    }
+}
 
-@app.post("/webhook")
-async def webhook(update: dict):
-    global application
-    if application:
-        try:
-            telegram_update = Update.de_json(update, application.bot)
-            await application.process_update(telegram_update)
-        except Exception as e:
-            print(f"Blad: {e}")
-    return JSONResponse({"ok": True})
+async def send_telegram_message(chat_id: int, text: str, reply_markup: Optional[dict] = None):
+    """Wyślij wiadomość Telegram"""
+    async with aiohttp.ClientSession() as session:
+        payload = {
+            "chat_id": chat_id,
+            "text": text,
+            "parse_mode": "HTML"
+        }
+        if reply_markup:
+            payload["reply_markup"] = reply_markup
+        
+        async with session.post(f"{TELEGRAM_API_URL}/sendMessage", json=payload) as resp:
+            if resp.status != 200:
+                logger.error(f"Telegram API error: {await resp.text()}")
+            return await resp.json()
+
+async def set_webhook(webhook_url: str):
+    """Ustaw webhook dla bota"""
+    async with aiohttp.ClientSession() as session:
+        payload = {
+            "url": webhook_url,
+            "allowed_updates": ["message", "callback_query", "web_app_info"]
+        }
+        async with session.post(f"{TELEGRAM_API_URL}/setWebhook", json=payload) as resp:
+            result = await resp.json()
+            logger.info(f"Webhook set result: {result}")
+            return result
+
+async def get_webhook_info():
+    """Pobierz informacje o webhoku"""
+    async with aiohttp.ClientSession() as session:
+        async with session.get(f"{TELEGRAM_API_URL}/getWebhookInfo") as resp:
+            return await resp.json()
+
+def get_main_menu_keyboard():
+    """Główne menu"""
+    return {
+        "inline_keyboard": [
+            [{"text": "🔗 Połącz portfel", "callback_data": "connect_wallet"}],
+            [{"text": "📅 Moje rezerwacje", "callback_data": "my_reservations"}],
+            [{"text": "🏀 Dostępne boiska", "callback_data": "available_courts"}],
+            [{"text": "💬 Wsparcie", "callback_data": "support"}]
+        ]
+    }
+
+def get_courts_keyboard():
+    """Keyboard z dostępnymi boiskami"""
+    keyboard = []
+    for court_id, court in COURTS_DB.items():
+        status_emoji = "✅" if court["status"] == CourtStatus.AVAILABLE else "❌"
+        keyboard.append([{
+            "text": f"{status_emoji} {court['name']} ({court['price_per_hour']} PLN/h)",
+            "callback_data": f"court_{court_id}"
+        }])
+    keyboard.append([{"text": "◀️ Wróć", "callback_data": "back_main"}])
+    return {"inline_keyboard": keyboard}
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Startup i shutdown events"""
+    logger.info("Aplikacja startuje...")
+    webhook_result = await set_webhook(WEBHOOK_URL)
+    logger.info(f"Webhook status: {webhook_result}")
+    yield
+    logger.info("Aplikacja się wyłącza...")
+
+app = FastAPI(lifespan=lifespan)
 
 @app.get("/health")
-async def health():
-    return {"status": "ok"}
+async def health_check():
+    """Health check endpoint"""
+    return {
+        "status": "ok",
+        "timestamp": datetime.utcnow().isoformat(),
+        "webhook": WEBHOOK_URL,
+        "webapp": WEBAPP_URL
+    }
+
+@app.post("/webhook")
+async def webhook(request: Request):
+    """Webhook dla aktualizacji Telegram"""
+    try:
+        data = await request.json()
+        
+        # Obsługa wiadomości
+        if "message" in data:
+            message = data["message"]
+            chat_id = message["chat"]["id"]
+            user_id = message["from"]["id"]
+            text = message.get("text", "")
+            
+            sessions.update_user(user_id, state="main_menu")
+            
+            if text == "/start":
+                await send_telegram_message(
+                    chat_id,
+                    "🏀 <b>Witaj w HOOP.CONNECT!</b>\n\nAplicacja do rezerwacji hal do gry w koszykówkę.\n\nPołącz swój portfel TON aby zarezerwować boisko.",
+                    reply_markup=get_main_menu_keyboard()
+                )
+        
+        # Obsługa callback queries
+        elif "callback_query" in data:
+            callback = data["callback_query"]
+            chat_id = callback["from"]["id"]
+            user_id = callback["from"]["id"]
+            callback_data = callback["data"]
+            message_id = callback["message"]["message_id"]
+            
+            if callback_data == "connect_wallet":
+                user = sessions.get_user(user_id)
+                if not user["wallet_connected"]:
+                    await send_telegram_message(
+                        chat_id,
+                        "🔗 <b>Połącz portfel TON</b>\n\nUżyj aplikacji Tonkeeper aby połączyć swój portfel.\n\n<i>Wiadomość wysłana. Skanuj kod QR w Tonkeeper.</i>"
+                    )
+                    sessions.update_user(user_id, wallet_connected=True, wallet_address="EQxxx...")
+                    
+                    await send_telegram_message(
+                        chat_id,
+                        f"✅ Portfel połączony: EQxxx...\n\nMożesz teraz rezerwować boiska!",
+                        reply_markup=get_main_menu_keyboard()
+                    )
+                else:
+                    await send_telegram_message(
+                        chat_id,
+                        "✅ Twój portfel jest już połączony.",
+                        reply_markup=get_main_menu_keyboard()
+                    )
+            
+            elif callback_data == "available_courts":
+                await send_telegram_message(
+                    chat_id,
+                    "🏀 <b>Dostępne boiska:</b>",
+                    reply_markup=get_courts_keyboard()
+                )
+            
+            elif callback_data.startswith("court_"):
+                court_id = callback_data.split("_")[1]
+                court = COURTS_DB.get(court_id)
+                if court:
+                    user = sessions.get_user(user_id)
+                    if not user["wallet_connected"]:
+                        await send_telegram_message(
+                            chat_id,
+                            "⚠️ Musisz najpierw połączyć portfel aby zarezerwować boisko.\n\nWróć do menu głównego i kliknij 'Połącz portfel'.",
+                            reply_markup=get_main_menu_keyboard()
+                        )
+                    else:
+                        await send_telegram_message(
+                            chat_id,
+                            f"📅 <b>{court['name']}</b>\n\nCena: {court['price_per_hour']} PLN/h\nStatus: {court['status']}\n\nOtwórz aplikację poniżej aby zarezerwować:",
+                            reply_markup={
+                                "inline_keyboard": [[{
+                                    "text": "📱 Otwórz aplikację",
+                                    "web_app": {"url": f"{WEBAPP_URL}?court={court_id}&user={user_id}"}
+                                }]],
+                                "inline_keyboard": [[{"text": "◀️ Wróć", "callback_data": "back_main"}]]
+                            }
+                        )
+            
+            elif callback_data == "my_reservations":
+                user = sessions.get_user(user_id)
+                if not user["reservations"]:
+                    await send_telegram_message(
+                        chat_id,
+                        "📅 Brak rezerwacji.\n\nZarezerwuj boisko aby je zobaczyć tutaj.",
+                        reply_markup=get_main_menu_keyboard()
+                    )
+                else:
+                    res_text = "📅 <b>Twoje rezerwacje:</b>\n\n"
+                    for res in user["reservations"]:
+                        res_text += f"• {res['court']} - {res['date']} ({res['time']})\n"
+                    await send_telegram_message(chat_id, res_text, reply_markup=get_main_menu_keyboard())
+            
+            elif callback_data == "support":
+                await send_telegram_message(
+                    chat_id,
+                    "💬 <b>Wsparcie:</b>\n\nPróblemy? Skontaktuj się z nami:\nEmail: support@hoop.connect\nTelegram: @hoopconnect_support",
+                    reply_markup=get_main_menu_keyboard()
+                )
+            
+            elif callback_data == "back_main":
+                await send_telegram_message(
+                    chat_id,
+                    "🏀 <b>HOOP.CONNECT</b>\n\nGłówne menu",
+                    reply_markup=get_main_menu_keyboard()
+                )
+        
+        return {"ok": True}
+    
+    except Exception as e:
+        logger.error(f"Webhook error: {str(e)}", exc_info=True)
+        return {"ok": False, "error": str(e)}
+
+@app.get("/reset-webhook")
+async def reset_webhook():
+    """Resetuj webhook (NIE używaj BotFather)"""
+    try:
+        result = await set_webhook(WEBHOOK_URL)
+        return {"status": "success", "result": result}
+    except Exception as e:
+        logger.error(f"Reset webhook error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/")
 async def root():
-    html_content = """
-    <!DOCTYPE html>
-    <html lang="pl">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Hoop Connect - Koszyk</title>
-        <script src="https://telegram.org/js/telegram-web-app.js"></script>
-        <style>
-            * {
-                margin: 0;
-                padding: 0;
-                box-sizing: border-box;
-            }
+    """Serve HTML z frontendem"""
+    html_content = """<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HOOP.CONNECT - Rezerwacja hal do koszykówki</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        :root {
+            --primary-light: #1a1a1a;
+            --accent-light: #7CB342;
+            --bg-light: #ffffff;
+            --text-light: #333;
+            --primary-dark: #ffffff;
+            --accent-dark: #5DADE2;
+            --bg-dark: #1a1a1a;
+            --text-dark: #ffffff;
+        }
+        
+        @media (prefers-color-scheme: dark) {
             body {
-                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                min-height: 100vh;
-                display: flex;
-                flex-direction: column;
+                background: var(--bg-dark);
+                color: var(--text-dark);
             }
             .header {
-                background: rgba(255, 255, 255, 0.95);
-                padding: 20px;
-                border-bottom: 2px solid #667eea;
-                text-align: center;
-                box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+                background: var(--primary-dark);
+                color: var(--text-dark);
             }
-            .header h1 {
-                color: #667eea;
-                font-size: 28px;
-                margin-bottom: 5px;
-            }
-            .header p {
-                color: #999;
-                font-size: 14px;
-            }
-            .container {
-                flex: 1;
-                overflow-y: auto;
-                padding: 20px;
-            }
-            .product-card {
-                background: white;
-                border-radius: 12px;
-                padding: 15px;
-                margin-bottom: 15px;
-                box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-            }
-            .product-info h3 {
-                color: #333;
-                font-size: 16px;
-                margin-bottom: 5px;
-            }
-            .product-info p {
-                color: #999;
-                font-size: 13px;
-            }
-            .product-price {
-                color: #667eea;
-                font-weight: bold;
-                font-size: 18px;
-            }
-            .cart-info {
-                background: rgba(255, 255, 255, 0.95);
-                padding: 20px;
-                border-radius: 12px;
-                margin-bottom: 15px;
-                text-align: center;
-            }
-            .cart-total {
-                font-size: 24px;
-                color: #667eea;
-                font-weight: bold;
-                margin: 10px 0;
-            }
-            .button-group {
-                display: flex;
-                gap: 10px;
-                padding: 20px;
-                background: rgba(255, 255, 255, 0.95);
-                border-top: 2px solid #667eea;
-            }
-            button {
-                flex: 1;
-                padding: 15px;
-                border: none;
-                border-radius: 8px;
-                font-size: 16px;
-                font-weight: bold;
-                cursor: pointer;
-                transition: all 0.3s ease;
-            }
-            .btn-add {
-                background: #667eea;
+            .btn-primary {
+                background: var(--accent-dark);
                 color: white;
             }
-            .btn-add:active {
-                background: #5568d3;
-                transform: scale(0.98);
+            .btn-primary:hover {
+                background: #4A96C9;
             }
-            .btn-checkout {
-                background: #48bb78;
+            .court-card {
+                background: #2d2d2d;
+                border: 1px solid var(--accent-dark);
+            }
+        }
+        
+        @media (prefers-color-scheme: light) {
+            body {
+                background: var(--bg-light);
+                color: var(--text-light);
+            }
+            .header {
+                background: var(--primary-light);
                 color: white;
             }
-            .btn-checkout:active {
-                background: #38a169;
-                transform: scale(0.98);
-            }
-            .empty-cart {
-                text-align: center;
+            .btn-primary {
+                background: var(--accent-light);
                 color: white;
-                padding: 40px;
             }
-            .empty-cart svg {
-                width: 80px;
-                height: 80px;
-                margin-bottom: 20px;
-                opacity: 0.8;
+            .btn-primary:hover {
+                background: #689F38;
             }
-        </style>
-    </head>
-    <body>
-        <div class="header">
-            <h1>Hoop Connect</h1>
-            <p>Aplikacja handlowa</p>
-        </div>
+            .court-card {
+                background: #f5f5f5;
+                border: 1px solid var(--accent-light);
+            }
+        }
         
-        <div class="container">
-            <div class="cart-info">
-                <p>Twoj Koszyk</p>
-                <div class="cart-total" id="cart-total">0 PLN</div>
-                <p style="color: #999; font-size: 12px;" id="cart-items">0 produktów</p>
-            </div>
-            
-            <div id="products-list">
-                <div class="product-card">
-                    <div class="product-info">
-                        <h3>Produkt 1</h3>
-                        <p>Wysokiej jakosci towar</p>
-                    </div>
-                    <div style="text-align: right;">
-                        <div class="product-price">49.99 PLN</div>
-                        <button class="btn-add" onclick="addToCart('Produkt 1', 49.99)">Dodaj</button>
-                    </div>
-                </div>
-                
-                <div class="product-card">
-                    <div class="product-info">
-                        <h3>Produkt 2</h3>
-                        <p>Premium wersja</p>
-                    </div>
-                    <div style="text-align: right;">
-                        <div class="product-price">79.99 PLN</div>
-                        <button class="btn-add" onclick="addToCart('Produkt 2', 79.99)">Dodaj</button>
-                    </div>
-                </div>
-                
-                <div class="product-card">
-                    <div class="product-info">
-                        <h3>Produkt 3</h3>
-                        <p>Specjalna oferta</p>
-                    </div>
-                    <div style="text-align: right;">
-                        <div class="product-price">29.99 PLN</div>
-                        <button class="btn-add" onclick="addToCart('Produkt 3', 29.99)">Dodaj</button>
-                    </div>
-                </div>
-            </div>
-        </div>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            transition: background 0.3s, color 0.3s;
+        }
         
-        <div class="button-group">
-            <button class="btn-checkout" onclick="checkout()">Zakoncz Zakupy</button>
-        </div>
+        .header {
+            padding: 20px;
+            text-align: center;
+            transition: background 0.3s;
+        }
         
-        <script>
-            let cart = [];
-            
-            function initTelegram() {
-                if (window.Telegram && window.Telegram.WebApp) {
-                    window.Telegram.WebApp.ready();
-                    window.Telegram.WebApp.expand();
-                }
-            }
-            
-            function addToCart(name, price) {
-                cart.push({ name: name, price: price });
-                updateCart();
-            }
-            
-            function updateCart() {
-                const total = cart.reduce((sum, item) => sum + item.price, 0).toFixed(2);
-                document.getElementById('cart-total').textContent = total + ' PLN';
-                document.getElementById('cart-items').textContent = cart.length + ' produktów';
-            }
-            
-            function checkout() {
-                if (cart.length === 0) {
-                    alert('Dodaj produkty do koszyka!');
-                    return;
-                }
-                const total = cart.reduce((sum, item) => sum + item.price, 0).toFixed(2);
-                const message = 'Zamowienie: ' + cart.map(item => item.name).join(', ') + ' - Suma: ' + total + ' PLN';
-                if (window.Telegram && window.Telegram.WebApp) {
-                    window.Telegram.WebApp.sendData(message);
-                }
-            }
-            
-            window.addEventListener('load', initTelegram);
-            initTelegram();
-        </script>
-    </body>
-    </html>
-    """
-    return HTMLResponse(content=html_content)
-
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=PORT)
+        .logo {
+            font-size: 32px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            letter-spacing: 2px;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .section {
+            margin: 30px 0;
+        }
+        
+        .section-title {
+            font-size: 20px;
+            font-
