@@ -109,8 +109,92 @@ async def reset_webhook():
 
 
 
-from fastapi.staticfiles import StaticFiles
-static_dir = Path(__file__).parent.parent / "basket_bot_frontend" / "dist"
-if static_dir.exists():
-    app.mount("/", StaticFiles(directory=str(static_dir), html=True), name="static")
+@app.get("/")
+async def root():
+    html = """
+    <!DOCTYPE html>
+    <html lang="pl">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Basket Bot</title>
+        <script src="https://telegram.org/js/telegram-web-app.js"></script>
+        <style>
+            body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f0f0f0; }
+            .container { max-width: 500px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+            h1 { color: #333; text-align: center; margin-top: 0; }
+            p { color: #666; text-align: center; }
+            .status { background: #f9f9f9; padding: 15px; border-left: 4px solid #667eea; margin: 20px 0; }
+            .status-title { font-weight: bold; margin-bottom: 10px; }
+            .status-item { margin: 8px 0; font-size: 14px; }
+            button { padding: 10px 20px; margin: 10px 0; width: 100%; border: none; border-radius: 5px; cursor: pointer; font-size: 14px; font-weight: bold; }
+            .btn-primary { background: #667eea; color: white; }
+            .btn-primary:hover { background: #5568d3; }
+            .btn-secondary { background: #e0e0e0; color: #333; }
+            .btn-secondary:hover { background: #d0d0d0; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>Basket Bot</h1>
+            <p>Telegram bot application</p>
+            
+            <div class="status">
+                <div class="status-title">System Status</div>
+                <div class="status-item">Backend: Online</div>
+                <div class="status-item" id="telegram-status">Telegram: Waiting</div>
+                <div class="status-item" id="user-status">User: Not connected</div>
+            </div>
+            
+            <button class="btn-primary" onclick="openApp()">Open Application</button>
+            <button class="btn-secondary" onclick="resetWebhook()">Reset Webhook</button>
+            
+            <p style="text-align: center; color: #999; font-size: 12px; margin-top: 30px;">Basket Bot v1.0 | Railway Deployment</p>
+        </div>
+
+        <script>
+            function initTelegram() {
+                if (window.Telegram && window.Telegram.WebApp) {
+                    var tg = window.Telegram.WebApp;
+                    tg.ready();
+                    document.getElementById('telegram-status').textContent = 'Telegram: Connected';
+                    
+                    if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+                        var user = tg.initDataUnsafe.user;
+                        document.getElementById('user-status').textContent = 'User: ' + (user.first_name || 'Unknown');
+                    }
+                }
+            }
+
+            function openApp() {
+                if (window.Telegram && window.Telegram.WebApp) {
+                    window.Telegram.WebApp.expand();
+                }
+            }
+
+            function resetWebhook() {
+                fetch('/reset-webhook', { method: 'POST' })
+                    .then(function(response) {
+                        if (response.ok) {
+                            alert('Webhook reset successfully!');
+                        } else {
+                            alert('Error resetting webhook');
+                        }
+                    })
+                    .catch(function(error) {
+                        console.error('Error:', error);
+                        alert('Failed to reset webhook');
+                    });
+            }
+
+            window.addEventListener('load', initTelegram);
+            initTelegram();
+        </script>
+    </body>
+    </html>
+    """
+    from fastapi.responses import HTMLResponse
+    return HTMLResponse(content=html)
+
+
 uvicorn.run(app, host="0.0.0.0", port=PORT)
