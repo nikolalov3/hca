@@ -82,6 +82,9 @@ async def webhook(update: dict):
     return JSONResponse({"ok": True})
 
 
+@app.get("/")
+async def index():
+    return {"status": "ok", "message": "Hoop.connect bot backend"}
 @app.get("/health")
 async def health():
     return {"status": "ok"}
