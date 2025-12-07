@@ -16,9 +16,9 @@ import uvicorn
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-TELEGRAM_BOT_TOKEN = os.getenv("8353950120:AAExoG7jNlgLaM3ngovzCwVOyY8bLsG0deU")
-WEBHOOK_URL = os.getenv("https://hca-production.up.railway.app")
-WEBAPP_URL = os.getenv("https://hca-production.up.railway.app")
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")
+WEBAPP_URL = os.getenv("WEBAPP_URL")
 
 if not all([TELEGRAM_BOT_TOKEN, WEBHOOK_URL, WEBAPP_URL]):
     raise ValueError("Missing required environment variables: TELEGRAM_BOT_TOKEN, WEBHOOK_URL, WEBAPP_URL")
