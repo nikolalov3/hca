@@ -42,7 +42,7 @@ async def init_bot():
     
     application = ApplicationBuilder().token(TOKEN).build()
     application.add_handler(CommandHandler("start", start))
-        application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(CommandHandler("help", help_command))
     
     # Ustaw webhook
     if WEBHOOK_URL:
