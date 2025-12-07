@@ -14,6 +14,8 @@ WEBHOOK_URL = os.getenv("WEBHOOK_URL")  # np. https://twoja-domena.railway.app
 PORT = 8080
 
 app = FastAPI()
+application = None  # Global variable to store the bot application
+
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
@@ -25,37 +27,55 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=reply_markup
     )
 
-async def main():
+
+async def init_bot():
+    """Initialize the Telegram bot application"""
+    global application
+    
     application = ApplicationBuilder().token(TOKEN).build()
     application.add_handler(CommandHandler("start", start))
     
     # Ustaw webhook
-    
     if WEBHOOK_URL:
         await application.bot.delete_webhook(drop_pending_updates=True)
         await application.bot.set_webhook(url=f"{WEBHOOK_URL}/webhook")
+        print(f"Bot webhook set to: {WEBHOOK_URL}/webhook")
     
+    await application.initialize()
     return application
 
-application = None
 
 @app.on_event("startup")
 async def startup():
     global application
-    application = await main()
+    application = await init_bot()
     print(f"Bot has been started! Webhook: {WEBHOOK_URL}/webhook")
+
+
+@app.on_event("shutdown")
+async def shutdown():
+    global application
+    if application:
+        await application.stop()
+        await application.shutdown()
+
 
 @app.post("/webhook")
 async def webhook(update: dict):
     global application
     if application:
-        telegram_update = Update.de_json(update, application.bot)
-        await application.process_update(telegram_update)
+        try:
+            telegram_update = Update.de_json(update, application.bot)
+            await application.process_update(telegram_update)
+        except Exception as e:
+            print(f"Error processing update: {e}")
     return JSONResponse({"ok": True})
+
 
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
 
 @app.get("/reset-webhook")
 async def reset_webhook():
