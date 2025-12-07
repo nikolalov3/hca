@@ -8,8 +8,7 @@ import axios from 'axios';
 // Jeśli testujesz w przeglądarce na komputerze: http://localhost:8000
 // Jeśli testujesz w Telegramie na telefonie: Wpisz tu adres z tunelu ngrok (np. https://xxx.ngrok-free.app)
 // ---------------------------------------------------------
-const API_URL = "https://social-dolls-exist.loca.lt"; 
-
+const API_URL = "https://hca-production.up.railway.app";
 // --- KOMPONENT: KARTA MECZU ---
 const MatchCard = ({ match, onJoin, isWalletConnected }) => (
   <div className="bg-white dark:bg-cardDark rounded-2xl p-5 mb-4 shadow-sm border-2 border-babyBlue/30 hover:border-babyBlue transition-all duration-300">
