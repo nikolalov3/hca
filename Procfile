@@ -1,1 +1,2 @@
-web: python basket_bot_backend/bot.py
+web: uvicorn main:app --host 0.0.0.0 --port $PORT
+
