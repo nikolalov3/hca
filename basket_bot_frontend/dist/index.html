@@ -5,19 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Basket Bot</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
+        html, body {
+            width: 100%;
+            height: 100%;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+        }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -114,90 +114,75 @@
     </style>
 </head>
 <body>
-    <div id="root"></div>
+    <div class="container">
+        <div class="header">
+            <h1>📋 Basket Bot</h1>
+            <p>System zarządzania koszykiem Telegram</p>
+        </div>
+        <div class="status">
+            <div class="status-title">Status Systemu</div>
+            <div class="status-items">
+                <div class="status-item">
+                    <span class="status-badge" style="background: #10b981;"></span>
+                    <span>Backend: Działający</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-badge" id="telegram-badge" style="background: #ef4444;"></span>
+                    <span id="telegram-status">Telegram: Oczekiwanie</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-badge" id="user-badge" style="background: #ef4444;"></span>
+                    <span id="user-status">Użytkownik: Brak danych</span>
+                </div>
+            </div>
+        </div>
+        <div class="button-group">
+            <button class="btn-primary" onclick="openApp()">🚀 Otwórz Aplikację</button>
+            <button class="btn-secondary" onclick="resetWebhook()">🔄 Zresetuj Webhook</button>
+        </div>
+        <div class="info-text">Basket Bot v1.0 | Railway Deployment</div>
+    </div>
+
     <script>
-        const { useState, useEffect } = React;
-
-        function App() {
-            const [telegramReady, setTelegramReady] = useState(false);
-            const [userData, setUserData] = useState(null);
-            const [loading, setLoading] = useState(true);
-
-            useEffect(() => {
-                const initTelegram = async () => {
-                    if (window.Telegram && window.Telegram.WebApp) {
-                        const tg = window.Telegram.WebApp;
-                        tg.ready();
-                        setTelegramReady(true);
-                        setUserData(tg.initDataUnsafe?.user || null);
-                        setLoading(false);
-                    } else {
-                        setTimeout(initTelegram, 100);
-                    }
-                };
-                initTelegram();
-            }, []);
-
-            const handleOpenWebApp = () => {
-                if (window.Telegram?.WebApp) {
-                    window.Telegram.WebApp.expand();
+        function initTelegram() {
+            if (window.Telegram && window.Telegram.WebApp) {
+                const tg = window.Telegram.WebApp;
+                tg.ready();
+                document.getElementById('telegram-badge').style.background = '#10b981';
+                document.getElementById('telegram-status').textContent = 'Telegram: Połączony';
+                
+                const user = tg.initDataUnsafe?.user;
+                if (user) {
+                    document.getElementById('user-badge').style.background = '#10b981';
+                    document.getElementById('user-status').textContent = 'Użytkownik: ' + (user.first_name || 'Nieznany');
                 }
-            };
+            }
+        }
 
-            const handleResetWebhook = async () => {
-                try {
-                    const response = await fetch('/reset-webhook', { method: 'POST' });
+        function openApp() {
+            if (window.Telegram?.WebApp) {
+                window.Telegram.WebApp.expand();
+            }
+        }
+
+        function resetWebhook() {
+            fetch('/reset-webhook', { method: 'POST' })
+                .then(response => {
                     if (response.ok) {
                         alert('Webhook zresetowany pomyślnie!');
                     } else {
                         alert('Błąd przy resetowaniu webhooka');
                     }
-                } catch (error) {
-                    console.error('Webhook reset error:', error);
+                })
+                .catch(error => {
+                    console.error('Error:', error);
                     alert('Nie udało się zresetować webhooka');
-                }
-            };
-
-            return React.createElement('div', { className: 'container' },
-                React.createElement('div', { className: 'header' },
-                    React.createElement('h1', null, '\ud83d\udccb Basket Bot'),
-                    React.createElement('p', null, 'System zarządzania koszykiem Telegram')
-                ),
-                React.createElement('div', { className: 'status' },
-                    React.createElement('div', { className: 'status-title' }, 'Status Systemu'),
-                    React.createElement('div', { className: 'status-items' },
-                        React.createElement('div', { className: 'status-item' },
-                            React.createElement('span', { className: 'status-badge' }),
-                            'Backend: Działający'
-                        ),
-                        React.createElement('div', { className: 'status-item' },
-                            React.createElement('span', { className: 'status-badge', style: { background: telegramReady ? '#10b981' : '#ef4444' } }),
-                            'Telegram: ' + (telegramReady ? 'Połączony' : 'Oczekiwanie')
-                        ),
-                        React.createElement('div', { className: 'status-item' },
-                            React.createElement('span', { className: 'status-badge', style: { background: userData ? '#10b981' : '#ef4444' } }),
-                            userData ? 'Użytkownik: ' + (userData.first_name || 'Nieznany') : 'Użytkownik: Brak danych'
-                        )
-                    )
-                ),
-                React.createElement('div', { className: 'button-group' },
-                    React.createElement('button', {
-                        className: 'btn-primary',
-                        onClick: handleOpenWebApp
-                    }, '\ud83d\ude80 Otwórz Aplikację'),
-                    React.createElement('button', {
-                        className: 'btn-secondary',
-                        onClick: handleResetWebhook
-                    }, '\ud83d\udd04 Zresetuj Webhook')
-                ),
-                React.createElement('div', { className: 'info-text' },
-                    'Basket Bot v1.0 | Railway Deployment'
-                )
-            );
+                });
         }
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(React.createElement(App));
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', initTelegram);
+        initTelegram();
     </script>
 </body>
 </html>
