@@ -55,34 +55,5 @@ async def webhook(update: dict):
 async def health():
     return {"status": "ok"}
 
-    @app.get("/webhook-info")
-async def webhook_info():
-    """Get current webhook info and reset if needed"""
-    global application
-    if application:
-        webhook_info = await application.bot.get_webhook_info()
-        return {
-            "url": webhook_info.url,
-            "ip_address": webhook_info.ip_address,
-            "pending_update_count": webhook_info.pending_update_count,
-            "last_error_message": webhook_info.last_error_message,
-            "last_error_date": webhook_info.last_error_date,
-            "configured_url": f"{WEBHOOK_URL}/webhook"
-        }
-    return {"error": "application not initialized"}
-
-@app.post("/webhook-reset")
-async def webhook_reset():
-    """Force reset the webhook"""
-    global application
-    if application and WEBHOOK_URL:
-        try:
-            await application.bot.set_webhook(url=f"{WEBHOOK_URL}/webhook")
-            print(f"Webhook reset! New URL: {WEBHOOK_URL}/webhook")
-            return {"status": "success", "webhook_url": f"{WEBHOOK_URL}/webhook"}
-        except Exception as e:
-            return {"status": "error", "message": str(e)}
-    return {"error": "application not initialized or WEBHOOK_URL not set"}
-
-if __name__ == "__main__":
+    if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=PORT)
