@@ -58,5 +58,26 @@ async def webhook(update: dict):
 async def health():
     return {"status": "ok"}
 
+@app.get("/reset-webhook")
+async def reset_webhook():
+    """Force reset webhook to Railway URL - use this to migrate from ngrok"""
+    global application
+    if application and WEBHOOK_URL:
+        try:
+            # Delete old webhook first
+            await application.bot.delete_webhook(drop_pending_updates=False)
+            # Set new webhook
+            await application.bot.set_webhook(url=f"{WEBHOOK_URL}/webhook")
+            webhook_info = await application.bot.get_webhook_info()
+            return {
+                "status": "success",
+                "message": "Webhook reset successfully",
+                "webhook_url": webhook_info.url,
+                "pending_updates": webhook_info.pending_update_count
+            }
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+    return {"error": "application not initialized or WEBHOOK_URL not set"}
+
     if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=PORT)
