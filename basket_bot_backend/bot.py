@@ -66,9 +66,7 @@ async def startup():
 async def shutdown():
     global application
     if application:
-        await application.stop()
-        await application.shutdown()
-
+pass
 
 @app.post("/webhook")
 async def webhook(update: dict):
