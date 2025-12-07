@@ -3,8 +3,7 @@ from dotenv import load_dotenv
 from telegram import Update, WebAppInfo, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 from fastapi import FastAPI
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.responses import JSONResponse
 import uvicorn
 
 load_dotenv()
@@ -109,31 +108,6 @@ async def reset_webhook():
     return {"error": "application not initialized or WEBHOOK_URL not set"}
 
 
-# Mount React static files
-BUILD_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'basket_bot_frontend', 'build')
-if os.path.exists(BUILD_PATH):
-    app.mount('/static', StaticFiles(directory=os.path.join(BUILD_PATH, 'static')), name='static')
-
-@app.get('/')
-async def serve_root():
-    """Serve index.html for root path"""
-    index_path = os.path.join(BUILD_PATH, 'index.html')
-    if os.path.exists(index_path):
-        with open(index_path, 'r') as f:
-            return HTMLResponse(f.read())
-    return {"error": "Frontend not found"}
-
-@app.get('/{path:path}')
-async def serve_react(path: str):
-    """Catch-all route to serve React app for client-side routing"""
-    if path.startswith('api/') or path.startswith('webhook'):
-        return {"error": "Not found"}
-    # Serve index.html for all other routes
-    index_path = os.path.join(BUILD_PATH, 'index.html')
-    if os.path.exists(index_path):
-        with open(index_path, 'r') as f:
-            return HTMLResponse(f.read())
-    return {"error": "Frontend not found"}
             
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=PORT)
