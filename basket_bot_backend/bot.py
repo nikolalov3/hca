@@ -115,4 +115,4 @@ from fastapi.staticfiles import StaticFiles
 static_dir = Path(__file__).parent.parent / "basket_bot_frontend" / "build"
 if static_dir.exists():
     app.mount("/", StaticFiles(directory=str(static_dir), html=True), name="static")
-run(app, host="0.0.0.0", port=PORT)
+uvicorn.run(app, host="0.0.0.0", port=PORT)
