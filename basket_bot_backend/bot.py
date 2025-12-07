@@ -5,6 +5,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 import uvicorn
+from pathlib import Path
 
 load_dotenv()
 
