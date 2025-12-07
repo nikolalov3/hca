@@ -8,9 +8,9 @@ import uvicorn
 
 load_dotenv()
 
-TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-WEBAPP_URL = os.getenv("WEBAPP_URL")
-WEBHOOK_URL = os.getenv("WEBHOOK_URL")
+TOKEN = os.getenv("8353950120:AAExoG7jNlgLaM3ngovzCwVOyY8bLsG0deU")
+WEBAPP_URL = os.getenv("https://hca-production.up.railway.app")
+WEBHOOK_URL = os.getenv("https://hca-production.up.railway.app")
 PORT = 8080
 
 app = FastAPI()
