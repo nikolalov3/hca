@@ -78,5 +78,6 @@ async def reset_webhook():
             return {"status": "error", "message": str(e)}
     return {"error": "application not initialized or WEBHOOK_URL not set"}
 
-    if __name__ == "__main__":
+
+if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=PORT)
