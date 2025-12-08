@@ -114,4 +114,19 @@ async def get_matches():
     return [
         {"id": 1, "venue": "Arena Ursynów", "date": "Dziś, 18:00", "price": "15 PLN", "slots": "4/10", "status": "open"},
         {"id": 2, "venue": "OSiR Wola", "date": "Jutro, 20:00", "price": "20 PLN", "slots": "10/10", "status": "full"}
+
+@app.get("/api/profile/{telegram_id}")
+async def get_profile(telegram_id: int, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(User).where(User.telegram_id == telegram_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        return {"status": "not_found", "message": "Użytkownik nie znaleziony"}
+    return {
+        "telegram_id": user.telegram_id,
+        "name": user.name or "",
+        "age": user.age or "",
+        "height": user.height or "",
+        "number": user.number or "",
+        "wallet_address": user.wallet_address or ""
+    }
     ]
