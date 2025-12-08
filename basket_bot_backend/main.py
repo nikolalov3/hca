@@ -129,4 +129,3 @@ async def get_profile(telegram_id: int, db: AsyncSession = Depends(get_db)):
         "number": user.number or "",
         "wallet_address": user.wallet_address or ""
     }
-    ]
