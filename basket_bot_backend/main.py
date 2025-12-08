@@ -1,10 +1,10 @@
 import os
 import asyncio
-from fastapi import FastAPI, Depends
+import json
+from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from pydantic import BaseModel
 from contextlib import asynccontextmanager
 from telegram import Update, WebAppInfo, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
@@ -25,10 +25,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def start_bot():
-    if not TOKEN:
-        print("⚠️ BRAK TOKENU BOTA! Bot nie wystartuje.")
-        return None
-    print(f"🤖 Uruchamiam bota z WebApp URL: {WEBAPP_URL}")
+    if not TOKEN: return None
     application = ApplicationBuilder().token(TOKEN).build()
     application.add_handler(CommandHandler("start", start_command))
     await application.initialize()
@@ -36,23 +33,19 @@ async def start_bot():
     await application.updater.start_polling()
     return application
 
-# --- LIFESPAN ---
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    print("✅ Baza danych podłączona.")
     bot_app = await start_bot()
     yield
     if bot_app:
         await bot_app.updater.stop()
         await bot_app.stop()
         await bot_app.shutdown()
-        print("🛑 Bot zatrzymany.")
 
 app = FastAPI(lifespan=lifespan)
 
-# --- CORS ---
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -61,48 +54,51 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- MODEL DANYCH (ZMODYFIKOWANY - TOLERANCYJNY) ---
-class UserProfileUpdate(BaseModel):
-    # Przyjmujemy WSZYSTKO jako opcjonalne, zeby zobaczyc co przychodzi w logach
-    telegram_id: int | str | None = None
-    name: str | None = None
-    age: str | int | None = None
-    height: str | int | None = None
-    number: str | int | None = None
-    wallet_address: str | None = None
-
-    class Config:
-        extra = "allow"
-
 # --- ENDPOINTY ---
 
 @app.get("/")
 async def root():
-    return {"message": "HOOP.CONNECT działa na Railway 🚀"}
+    return {"message": "HOOP.CONNECT Backend"}
 
 @app.get("/api/profile/{telegram_id}")
 async def get_profile(telegram_id: int, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.telegram_id == telegram_id))
     user = result.scalar_one_or_none()
-    if not user:
-        return {"name": "", "age": "", "height": "", "number": ""}
+    if not user: return {"name": "", "age": "", "height": "", "number": ""}
     return user
 
-@app.post("/api/profile")
-async def update_profile( UserProfileUpdate, db: AsyncSession = Depends(get_db)):
-    # LOGOWANIE DLA CELÓW DEBUGOWANIA
-    print(f"DEBUG: Otrzymane dane JSON: {data.dict()}")
+# --- TUTAJ JEST KLUCZOWA ZMIANA ---
+# Nie używamy UserProfileUpdate. Używamy surowego Request.
+# To eliminuje błąd 422.
 
-    if not data.telegram_id:
-        print("BŁĄD: Brak telegram_id w requestcie!")
-        return {"status": "error", "message": "Brak telegram_id"}
+@app.post("/api/profile")
+async def update_profile(request: Request, db: AsyncSession = Depends(get_db)):
+    # 1. Odczytujemy surowy tekst
+    try:
+        body_bytes = await request.body()
+        body_str = body_bytes.decode('utf-8')
+        print(f"🛑 DEBUG RAW BODY: {body_str}")  # <--- SZUKAJ TEGO W LOGACH!
+        
+        data = json.loads(body_str)
+    except Exception as e:
+        print(f"Błąd parsowania JSON: {e}")
+        return {"status": "error", "message": "To nie jest JSON"}
+
+    # 2. Wyciągamy dane ręcznie
+    # Używamy .get() żeby nie wywaliło błędu jak czegoś brakuje
+    raw_id = data.get("telegram_id")
+    
+    if raw_id is None:
+        print("BŁĄD: Brak telegram_id w danych!")
+        return {"status": "error", "message": "Brak ID"}
 
     try:
-        tg_id = int(data.telegram_id)
-    except ValueError:
-        print(f"BŁĄD: telegram_id nie jest liczbą: {data.telegram_id}")
-        return {"status": "error", "message": "telegram_id musi byc liczba"}
+        tg_id = int(raw_id)
+    except:
+        print(f"BŁĄD: ID to nie liczba: {raw_id}")
+        return {"status": "error", "message": "ID musi byc liczba"}
 
+    # 3. Zapis do bazy
     result = await db.execute(select(User).where(User.telegram_id == tg_id))
     user = result.scalar_one_or_none()
 
@@ -110,16 +106,16 @@ async def update_profile( UserProfileUpdate, db: AsyncSession = Depends(get_db))
         user = User(telegram_id=tg_id)
         db.add(user)
     
-    if data.name is not None: user.name = data.name
-    # Konwersja na stringi (bo baza chce String, a frontend może przysłać int)
-    if data.age is not None: user.age = str(data.age)
-    if data.height is not None: user.height = str(data.height)
-    if data.number is not None: user.number = str(data.number)
-    if data.wallet_address is not None: user.wallet_address = data.wallet_address
+    # Bezpieczne przypisanie (rzutowanie na stringi dla pewności)
+    if "name" in  user.name = str(data["name"]) if data["name"] else ""
+    if "age" in  user.age = str(data["age"]) if data["age"] else ""
+    if "height" in  user.height = str(data["height"]) if data["height"] else ""
+    if "number" in  user.number = str(data["number"]) if data["number"] else ""
+    if "wallet_address" in  user.wallet_address = str(data["wallet_address"]) if data["wallet_address"] else ""
 
     await db.commit()
     await db.refresh(user)
-    print("SUKCES: Profil zaktualizowany!")
+    print("✅ SUKCES: Zapisano dane!")
     return {"status": "success", "user": user}
 
 @app.get("/api/matches")
