@@ -67,17 +67,13 @@ async def get_profile(telegram_id: int, db: AsyncSession = Depends(get_db)):
     if not user: return {"name": "", "age": "", "height": "", "number": ""}
     return user
 
-# --- TUTAJ JEST KLUCZOWA ZMIANA ---
-# Nie używamy UserProfileUpdate. Używamy surowego Request.
-# To eliminuje błąd 422.
-
 @app.post("/api/profile")
 async def update_profile(request: Request, db: AsyncSession = Depends(get_db)):
     # 1. Odczytujemy surowy tekst
     try:
         body_bytes = await request.body()
         body_str = body_bytes.decode('utf-8')
-        print(f"🛑 DEBUG RAW BODY: {body_str}")  # <--- SZUKAJ TEGO W LOGACH!
+        print(f"🛑 DEBUG RAW BODY: {body_str}")
         
         data = json.loads(body_str)
     except Exception as e:
@@ -85,7 +81,6 @@ async def update_profile(request: Request, db: AsyncSession = Depends(get_db)):
         return {"status": "error", "message": "To nie jest JSON"}
 
     # 2. Wyciągamy dane ręcznie
-    # Używamy .get() żeby nie wywaliło błędu jak czegoś brakuje
     raw_id = data.get("telegram_id")
     
     if raw_id is None:
