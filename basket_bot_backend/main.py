@@ -11,7 +11,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
 # Importy lokalne
 from database import engine, Base, get_db
-from models import User
+from models import User, Match
 
 # --- KONFIGURACJA BOTA ---
 TOKEN = os.getenv("BOT_TOKEN") or os.getenv("TELEGRAM_BOT_TOKEN")
@@ -128,4 +128,90 @@ async def get_profile(telegram_id: int, db: AsyncSession = Depends(get_db)):
         "height": user.height or "",
         "number": user.number or "",
         "wallet_address": user.wallet_address or ""
+    }
+
+# --- MATCH ENDPOINTS (Tworzenie i dołączanie do meczów) ---
+@app.post("/api/matches")
+async def create_match(request: Request, db: AsyncSession = Depends(get_db)):
+    try:
+        data = await request.json()
+    except:
+        return {"status": "error", "message": "Blęd JSON"}
+    
+    tg_id = data.get("telegram_id")
+    venue = data.get("venue")  # Nazwa miejsca
+    crowdfund_amount = data.get("crowdfund_amount", 0)  # Kwota zrzutki
+    slots_needed = data.get("slots_needed")  # 8 lub 10
+    
+    if not tg_id or not venue or not slots_needed:
+        return {"status": "error", "message": "Brak wymaganych pol: telegram_id, venue, slots_needed"}
+    
+    if slots_needed not in [8, 10]:
+        return {"status": "error", "message": "slots_needed musi być 8 (4v4) lub 10 (5v5)"}
+    
+    new_match = Match(
+        venue=venue,
+        crowdfund_amount=int(crowdfund_amount),
+        slots_needed=int(slots_needed),
+        current_players=1,
+        organizer_id=int(tg_id)
+    )
+    
+    db.add(new_match)
+    await db.commit()
+    await db.refresh(new_match)
+    
+    return {
+        "status": "success",
+        "match_id": new_match.match_id,
+        "venue": new_match.venue,
+        "crowdfund_amount": new_match.crowdfund_amount,
+        "slots_needed": new_match.slots_needed,
+        "current_players": new_match.current_players
+    }
+
+@app.get("/api/matches-list")
+async def get_all_matches(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Match))
+    matches = result.scalars().all()
+    
+    return [
+        {
+            "match_id": m.match_id,
+            "venue": m.venue,
+            "crowdfund_amount": m.crowdfund_amount,
+            "slots_needed": m.slots_needed,
+            "current_players": m.current_players,
+            "slots_available": m.slots_needed - m.current_players,
+            "organizer_id": m.organizer_id
+        }
+        for m in matches
+    ]
+
+@app.post("/api/matches/{match_id}/join")
+async def join_match(match_id: int, request: Request, db: AsyncSession = Depends(get_db)):
+    try:
+        data = await request.json()
+        tg_id = data.get("telegram_id")
+    except:
+        return {"status": "error", "message": "Blęd JSON lub brak telegram_id"}
+    
+    result = await db.execute(select(Match).where(Match.match_id == match_id))
+    match = result.scalar_one_or_none()
+    
+    if not match:
+        return {"status": "error", "message": "Mecz nie istnieje"}
+    
+    if match.current_players >= match.slots_needed:
+        return {"status": "error", "message": "Mecz pełny!"}
+    
+    match.current_players += 1
+    await db.commit()
+    await db.refresh(match)
+    
+    return {
+        "status": "success",
+        "message": f"Dokonczonales się do meczu! ({match.current_players}/{match.slots_needed})",
+        "current_players": match.current_players,
+        "slots_available": match.slots_needed - match.current_players
     }
