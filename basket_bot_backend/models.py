@@ -15,7 +15,7 @@ class User(Base):
     number = Column(String, default="")
 
     class Match(Base):
-            __tablename__ = "matches"
+                __tablename__ = "matches"
     match_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     venue = Column(String, nullable=False)  # Nazwa miejsca
     crowdfund_amount = Column(Integer, default=0)  # Kwota zrzutki (PLN)
