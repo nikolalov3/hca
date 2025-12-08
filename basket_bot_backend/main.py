@@ -25,20 +25,32 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def start_bot():
-    if not TOKEN: return None
-    application = ApplicationBuilder().token(TOKEN).build()
-    application.add_handler(CommandHandler("start", start_command))
-    await application.initialize()
-    await application.start()
-    await application.updater.start_polling()
-    return application
+    if not TOKEN:
+        print("⚠️ BRAK TOKENU BOTA!")
+        return None
+    
+    app_bot = ApplicationBuilder().token(TOKEN).build()
+    app_bot.add_handler(CommandHandler("start", start_command))
+    
+    await app_bot.initialize()
+    await app_bot.start()
+    await app_bot.updater.start_polling()
+    print("✅ Bot wystartował!")
+    return app_bot
 
+# --- LIFESPAN ---
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Start Bazy
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    
+    # Start Bota
     bot_app = await start_bot()
+    
     yield
+    
+    # Stop Bota
     if bot_app:
         await bot_app.updater.stop()
         await bot_app.stop()
@@ -58,40 +70,35 @@ app.add_middleware(
 
 @app.get("/")
 async def root():
-    return {"message": "HOOP.CONNECT Backend"}
+    return {"message": "HOOP.CONNECT Backend działa"}
 
 @app.get("/api/profile/{telegram_id}")
 async def get_profile(telegram_id: int, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.telegram_id == telegram_id))
     user = result.scalar_one_or_none()
-    if not user: return {"name": "", "age": "", "height": "", "number": ""}
+    if not user:
+        return {"name": "", "age": "", "height": "", "number": ""}
     return user
 
 @app.post("/api/profile")
 async def update_profile(request: Request, db: AsyncSession = Depends(get_db)):
-    # 1. Odczytujemy surowy tekst
+    # 1. Odczytujemy dane
     try:
-        body_bytes = await request.body()
-        body_str = body_bytes.decode('utf-8')
-        print(f"🛑 DEBUG RAW BODY: {body_str}")
-        
-        data = json.loads(body_str)
+        data = await request.json()
+        print(f"DEBUG: {data}")
     except Exception as e:
-        print(f"Błąd parsowania JSON: {e}")
-        return {"status": "error", "message": "To nie jest JSON"}
+        print(f"Błąd JSON: {e}")
+        return {"status": "error", "message": "Błąd JSON"}
 
-    # 2. Wyciągamy dane ręcznie
+    # 2. Wyciągamy ID
     raw_id = data.get("telegram_id")
-    
-    if raw_id is None:
-        print("BŁĄD: Brak telegram_id w danych!")
+    if not raw_id:
         return {"status": "error", "message": "Brak ID"}
 
     try:
         tg_id = int(raw_id)
     except:
-        print(f"BŁĄD: ID to nie liczba: {raw_id}")
-        return {"status": "error", "message": "ID musi byc liczba"}
+        return {"status": "error", "message": "ID musi być liczbą"}
 
     # 3. Zapis do bazy
     result = await db.execute(select(User).where(User.telegram_id == tg_id))
@@ -101,16 +108,15 @@ async def update_profile(request: Request, db: AsyncSession = Depends(get_db)):
         user = User(telegram_id=tg_id)
         db.add(user)
     
-    # Bezpieczne przypisanie (rzutowanie na stringi dla pewności)
-    if "name" in  user.name = str(data["name"]) if data["name"] else ""
-    if "age" in  user.age = str(data["age"]) if data["age"] else ""
-    if "height" in  user.height = str(data["height"]) if data["height"] else ""
-    if "number" in  user.number = str(data["number"]) if data["number"] else ""
-    if "wallet_address" in  user.wallet_address = str(data["wallet_address"]) if data["wallet_address"] else ""
+    # Aktualizacja pól (bezpiecznie)
+    if "name" in  user.name = str(data["name"] or "")
+    if "age" in  user.age = str(data["age"] or "")
+    if "height" in  user.height = str(data["height"] or "")
+    if "number" in  user.number = str(data["number"] or "")
+    if "wallet_address" in  user.wallet_address = str(data["wallet_address"] or "")
 
     await db.commit()
     await db.refresh(user)
-    print("✅ SUKCES: Zapisano dane!")
     return {"status": "success", "user": user}
 
 @app.get("/api/matches")
