@@ -77,50 +77,51 @@ async def update_profile(request: Request, db: AsyncSession = Depends(get_db)):
     except Exception as e:
         print(f"Błąd JSON: {e}")
         return {"status": "error", "message": "Błąd JSON"}
-
+    
     # 2. Wyciągamy ID
     raw_id = data.get("telegram_id")
     if not raw_id:
         return {"status": "error", "message": "Brak ID"}
-
+    
     try:
         tg_id = int(raw_id)
     except:
         return {"status": "error", "message": "ID musi być liczbą"}
-
+    
     # 3. Zapis do bazy
     result = await db.execute(select(User).where(User.telegram_id == tg_id))
     user = result.scalar_one_or_none()
-
+    
     if not user:
         user = User(telegram_id=tg_id)
         db.add(user)
     
-    # 4. Aktualizacja pól (Metoda .get() jest bezpieczniejsza i krótsza)
-    # Pobieramy wartość z JSONa, a jak jej nie ma, zostawiamy starą wartość (user.name)
+    # 4. Aktualizacja pól
     user.name = str(data.get("name") or user.name or "")
     user.age = str(data.get("age") or user.age or "")
     user.height = str(data.get("height") or user.height or "")
     user.number = str(data.get("number") or user.number or "")
     user.wallet_address = str(data.get("wallet_address") or user.wallet_address or "")
-
+    
     await db.commit()
     await db.refresh(user)
     return {"status": "success", "user": user}
-
 
 @app.get("/api/matches")
 async def get_matches():
     return [
         {"id": 1, "venue": "Arena Ursynów", "date": "Dziś, 18:00", "price": "15 PLN", "slots": "4/10", "status": "open"},
-            {"id": 2, "venue": "OSiR Wola", "date": "Jutro, 20:00", "price": "20 PLN", "slots": "10/10", "status": "full"},
-            ]
+        {"id": 2, "venue": "OSiR Wola", "date": "Jutro, 20:00", "price": "20 PLN", "slots": "10/10", "status": "full"},
+    ]
+
 @app.get("/api/profile/{telegram_id}")
 async def get_profile(telegram_id: int, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.telegram_id == telegram_id))
     user = result.scalar_one_or_none()
+    
     if not user:
         return {"status": "not_found", "message": "Użytkownik nie znaleziony"}
+    
     return {
         "telegram_id": user.telegram_id,
         "name": user.name or "",
@@ -130,21 +131,22 @@ async def get_profile(telegram_id: int, db: AsyncSession = Depends(get_db)):
         "wallet_address": user.wallet_address or ""
     }
 
-# --- MATCH ENDPOINTS (Tworzenie i dołączanie do meczów) ---
+# --- MATCH ENDPOINTS ---
+
 @app.post("/api/matches")
 async def create_match(request: Request, db: AsyncSession = Depends(get_db)):
     try:
         data = await request.json()
     except:
-        return {"status": "error", "message": "Blęd JSON"}
+        return {"status": "error", "message": "Błąd JSON"}
     
     tg_id = data.get("telegram_id")
-    venue = data.get("venue")  # Nazwa miejsca
-    crowdfund_amount = data.get("crowdfund_amount", 0)  # Kwota zrzutki
-    slots_needed = data.get("slots_needed")  # 8 lub 10
+    venue = data.get("venue")
+    crowdfund_amount = data.get("crowdfund_amount", 0)
+    slots_needed = data.get("slots_needed")
     
     if not tg_id or not venue or not slots_needed:
-        return {"status": "error", "message": "Brak wymaganych pol: telegram_id, venue, slots_needed"}
+        return {"status": "error", "message": "Brak wymaganych pól: telegram_id, venue, slots_needed"}
     
     if slots_needed not in [8, 10]:
         return {"status": "error", "message": "slots_needed musi być 8 (4v4) lub 10 (5v5)"}
@@ -156,7 +158,6 @@ async def create_match(request: Request, db: AsyncSession = Depends(get_db)):
         current_players=1,
         organizer_id=int(tg_id)
     )
-    
     db.add(new_match)
     await db.commit()
     await db.refresh(new_match)
@@ -194,7 +195,7 @@ async def join_match(match_id: int, request: Request, db: AsyncSession = Depends
         data = await request.json()
         tg_id = data.get("telegram_id")
     except:
-        return {"status": "error", "message": "Blęd JSON lub brak telegram_id"}
+        return {"status": "error", "message": "Błąd JSON lub brak telegram_id"}
     
     result = await db.execute(select(Match).where(Match.match_id == match_id))
     match = result.scalar_one_or_none()
@@ -211,7 +212,7 @@ async def join_match(match_id: int, request: Request, db: AsyncSession = Depends
     
     return {
         "status": "success",
-        "message": f"Dokonczonales się do meczu! ({match.current_players}/{match.slots_needed})",
+        "message": f"Dołączyłeś się do meczu! ({match.current_players}/{match.slots_needed})",
         "current_players": match.current_players,
         "slots_available": match.slots_needed - match.current_players
     }
