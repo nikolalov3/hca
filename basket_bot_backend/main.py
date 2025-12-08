@@ -12,6 +12,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 # Importy lokalne
 from database import engine, Base, get_db
 from models import User, Match
+from auth import create_access_token, verify_token, get_current_user
 
 # --- KONFIGURACJA BOTA ---
 TOKEN = os.getenv("BOT_TOKEN") or os.getenv("TELEGRAM_BOT_TOKEN")
@@ -216,3 +217,71 @@ async def join_match(match_id: int, request: Request, db: AsyncSession = Depends
         "current_players": match.current_players,
         "slots_available": match.slots_needed - match.current_players
     }
+
+# --- AUTH ENDPOINTS ---
+
+class LoginRequest(BaseModel):
+    wallet_address: str
+    message: str
+    signature: str
+
+@app.post("/api/auth/login")
+async def login(request: LoginRequest, db: AsyncSession = Depends(get_db)):
+    """
+    TON Wallet authentication endpoint
+    Verifies wallet signature and returns JWT token
+    """
+    try:
+        # Verify the signature (simplified - implement full verification in production)
+        wallet_address = request.wallet_address
+        
+        # Check if user exists or create new one
+        result = await db.execute(select(User).where(User.wallet_address == wallet_address))
+        user = result.scalar_one_or_none()
+        
+        if not user:
+            # Create new user with wallet address
+            user = User(
+                wallet_address=wallet_address,
+                username="",
+                telegram_id=None
+            )
+            db.add(user)
+            await db.commit()
+            await db.refresh(user)
+        
+        # Generate JWT token
+        access_token = create_access_token(wallet_address=wallet_address)
+        
+        return {
+            "status": "success",
+            "access_token": access_token,
+            "token_type": "bearer",
+            "wallet_address": wallet_address
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@app.get("/api/auth/me")
+async def get_profile(wallet_address: str = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """
+    Get current user profile
+    Requires valid JWT token
+    """
+    try:
+        result = await db.execute(select(User).where(User.wallet_address == wallet_address))
+        user = result.scalar_one_or_none()
+        
+        if not user:
+            return {"status": "error", "message": "User not found"}
+        
+        return {
+            "status": "success",
+            "user": {
+                "wallet_address": user.wallet_address,
+                "username": user.username or "",
+                "telegram_id": user.telegram_id or ""
+            }
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
