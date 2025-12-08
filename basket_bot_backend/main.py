@@ -14,12 +14,10 @@ from database import engine, Base, get_db
 from models import User
 
 # --- KONFIGURACJA BOTA ---
-TOKEN = os.getenv("BOT_TOKEN") or os.getenv("TELEGRAM_BOT_TOKEN") # Railway czasem używa różnych nazw
-# Tutaj wpisz swój adres frontendu, jeśli zmienna nie zadziała
+TOKEN = os.getenv("BOT_TOKEN") or os.getenv("TELEGRAM_BOT_TOKEN")
 WEBAPP_URL = os.getenv("WEBAPP_URL", "https://hca-production.up.railway.app")
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Tworzymy przycisk otwierający Web App
     keyboard = [[InlineKeyboardButton("🏀 GRAJ W KOSZA", web_app=WebAppInfo(url=WEBAPP_URL))]]
     await update.message.reply_text(
         "Siemano! Gotowy na mecz? Kliknij poniżej (Cloud ☁️):",
@@ -27,35 +25,25 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def start_bot():
-    """Funkcja uruchamiająca bota w tle"""
     if not TOKEN:
         print("⚠️ BRAK TOKENU BOTA! Bot nie wystartuje.")
         return None
-    
     print(f"🤖 Uruchamiam bota z WebApp URL: {WEBAPP_URL}")
     application = ApplicationBuilder().token(TOKEN).build()
     application.add_handler(CommandHandler("start", start_command))
-    
-    # Startujemy bota bez blokowania
     await application.initialize()
     await application.start()
     await application.updater.start_polling()
     return application
 
-# --- LIFESPAN (Start/Stop wszystkiego) ---
+# --- LIFESPAN ---
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # 1. Baza Danych
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     print("✅ Baza danych podłączona.")
-
-    # 2. Start Bota
     bot_app = await start_bot()
-    
     yield
-    
-    # 3. Stop Bota
     if bot_app:
         await bot_app.updater.stop()
         await bot_app.stop()
@@ -73,19 +61,24 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- MODELE ---
+# --- MODEL DANYCH (ZMODYFIKOWANY - TOLERANCYJNY) ---
 class UserProfileUpdate(BaseModel):
-    telegram_id: int
+    # Przyjmujemy WSZYSTKO jako opcjonalne, zeby zobaczyc co przychodzi w logach
+    telegram_id: int | str | None = None
     name: str | None = None
-    age: str | None = None
-    height: str | None = None
-    number: str | None = None
+    age: str | int | None = None
+    height: str | int | None = None
+    number: str | int | None = None
     wallet_address: str | None = None
 
+    class Config:
+        extra = "allow"
+
 # --- ENDPOINTY ---
+
 @app.get("/")
 async def root():
-    return {"message": "HOOP.CONNECT działa na Railway 🚀 (Bot zintegrowany)"}
+    return {"message": "HOOP.CONNECT działa na Railway 🚀"}
 
 @app.get("/api/profile/{telegram_id}")
 async def get_profile(telegram_id: int, db: AsyncSession = Depends(get_db)):
@@ -97,21 +90,36 @@ async def get_profile(telegram_id: int, db: AsyncSession = Depends(get_db)):
 
 @app.post("/api/profile")
 async def update_profile( UserProfileUpdate, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(User).where(User.telegram_id == data.telegram_id))
+    # LOGOWANIE DLA CELÓW DEBUGOWANIA
+    print(f"DEBUG: Otrzymane dane JSON: {data.dict()}")
+
+    if not data.telegram_id:
+        print("BŁĄD: Brak telegram_id w requestcie!")
+        return {"status": "error", "message": "Brak telegram_id"}
+
+    try:
+        tg_id = int(data.telegram_id)
+    except ValueError:
+        print(f"BŁĄD: telegram_id nie jest liczbą: {data.telegram_id}")
+        return {"status": "error", "message": "telegram_id musi byc liczba"}
+
+    result = await db.execute(select(User).where(User.telegram_id == tg_id))
     user = result.scalar_one_or_none()
 
     if not user:
-        user = User(telegram_id=data.telegram_id)
+        user = User(telegram_id=tg_id)
         db.add(user)
     
     if data.name is not None: user.name = data.name
-    if data.age is not None: user.age = data.age
-    if data.height is not None: user.height = data.height
-    if data.number is not None: user.number = data.number
+    # Konwersja na stringi (bo baza chce String, a frontend może przysłać int)
+    if data.age is not None: user.age = str(data.age)
+    if data.height is not None: user.height = str(data.height)
+    if data.number is not None: user.number = str(data.number)
     if data.wallet_address is not None: user.wallet_address = data.wallet_address
 
     await db.commit()
     await db.refresh(user)
+    print("SUKCES: Profil zaktualizowany!")
     return {"status": "success", "user": user}
 
 @app.get("/api/matches")
