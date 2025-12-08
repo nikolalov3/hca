@@ -68,18 +68,6 @@ app.add_middleware(
 
 # --- ENDPOINTY ---
 
-@app.get("/")
-async def root():
-    return {"message": "HOOP.CONNECT Backend działa"}
-
-@app.get("/api/profile/{telegram_id}")
-async def get_profile(telegram_id: int, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(User).where(User.telegram_id == telegram_id))
-    user = result.scalar_one_or_none()
-    if not user:
-        return {"name": "", "age": "", "height": "", "number": ""}
-    return user
-
 @app.post("/api/profile")
 async def update_profile(request: Request, db: AsyncSession = Depends(get_db)):
     # 1. Odczytujemy dane
@@ -108,16 +96,18 @@ async def update_profile(request: Request, db: AsyncSession = Depends(get_db)):
         user = User(telegram_id=tg_id)
         db.add(user)
     
-    # Aktualizacja pól (bezpiecznie)
-    if "name" in  user.name = str(data["name"] or "")
-    if "age" in  user.age = str(data["age"] or "")
-    if "height" in  user.height = str(data["height"] or "")
-    if "number" in  user.number = str(data["number"] or "")
-    if "wallet_address" in  user.wallet_address = str(data["wallet_address"] or "")
+    # 4. Aktualizacja pól (Metoda .get() jest bezpieczniejsza i krótsza)
+    # Pobieramy wartość z JSONa, a jak jej nie ma, zostawiamy starą wartość (user.name)
+    user.name = str(data.get("name") or user.name or "")
+    user.age = str(data.get("age") or user.age or "")
+    user.height = str(data.get("height") or user.height or "")
+    user.number = str(data.get("number") or user.number or "")
+    user.wallet_address = str(data.get("wallet_address") or user.wallet_address or "")
 
     await db.commit()
     await db.refresh(user)
     return {"status": "success", "user": user}
+
 
 @app.get("/api/matches")
 async def get_matches():
