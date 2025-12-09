@@ -1,4 +1,3 @@
-import jwt
 import os
 from datetime import datetime, timedelta
 from functools import wraps
