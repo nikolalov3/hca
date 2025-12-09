@@ -3,8 +3,6 @@ from datetime import datetime, timedelta
 from functools import wraps
 from fastapi import HTTPException, status, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from tonpy.utils import Address
-from tonpy.contract.wallet import Wallet
 SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
@@ -23,7 +21,6 @@ def verify_ton_signature(address: str, message: str, signature: str) -> bool:
     """
     try:
         # Parse the address
-        wallet_address = Address(address)
         # In production, implement actual TON signature verification
         # using tonpy library
         return True
