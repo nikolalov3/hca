@@ -1,6 +1,7 @@
 import os
 import asyncio
 import json
+from pydantic import BaseModel
 from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
