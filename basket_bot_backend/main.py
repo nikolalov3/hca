@@ -298,7 +298,6 @@ class ProfileUpdate(BaseModel):
     preferred_position: str | None = None  # G, F, C
     bio: str | None = None
     phone: str | None = None
-        name: str | None = None  # Alias for nickname
 
 
 @app.get("/api/profile/me")
@@ -358,8 +357,8 @@ profile_data: ProfileUpdate, wallet_address: str = Depends(get_current_user), db
         if user.profile:
             # Update existing profile
             profile = user.profile
-            if profile_data.nickname is not None or profile_data.name is not None:
-                profile.nickname = profile_data.nickname or profile_data.name
+            if profile_data.nickname is not None:
+                profile.nickname = profile_data.nickname 
             if profile_data.age is not None:
                 profile.age = profile_data.age
             if profile_data.city is not None:
@@ -376,7 +375,7 @@ profile_data: ProfileUpdate, wallet_address: str = Depends(get_current_user), db
             # Create new profile
             profile = Profile(
                 user_id=user.wallet_address,
-                nickname=pprofile_data.nickname or profile_data.name,
+                nickname=pprofile_data.nickname ,
                 age=profile_data.age,
                 city=profile_data.city,
                 skill_level=profile_data.skill_level,
