@@ -23,8 +23,7 @@ class User(Base):
     # Relationship
     matches_created = relationship("Match", back_populates="organizer")
     matches_joined = relationship("MatchParticipant", back_populates="user")
-        profile = relationship("Profile", back_populates="user", uselist=False)
-
+    profile = relationship("Profile", back_populates="user", uselist=False)
 
 class Match(Base):
     __tablename__ = "matches"
