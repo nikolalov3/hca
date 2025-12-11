@@ -64,8 +64,7 @@ class Profile(Base):
     __tablename__ = "profiles"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True, index=True)
-    
+    user_id = Column(String, ForeignKey("users.wallet_address"), nullable=False, unique=True, index=True)    
     # Dane profilu
     nickname = Column(String, nullable=True)  # Nick gracza
     age = Column(Integer, nullable=True)  # Wiek
