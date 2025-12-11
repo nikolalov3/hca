@@ -46,8 +46,7 @@ async def lifespan(app: FastAPI):
     # Start Bazy
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-                await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS telegram_id INTEGER"))
-    
+        await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS telegram_id INTEGER"))    
     # Start Bota
     bot_app = await start_bot()
     
