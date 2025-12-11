@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, text
 from contextlib import asynccontextmanager
 from telegram import Update, WebAppInfo, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
@@ -46,6 +46,7 @@ async def lifespan(app: FastAPI):
     # Start Bazy
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+                await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS telegram_id INTEGER"))
     
     # Start Bota
     bot_app = await start_bot()
