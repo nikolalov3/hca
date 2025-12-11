@@ -340,7 +340,8 @@ async def get_profile(wallet_address: str = Depends(get_current_user), db: Async
 
 
 @app.post("/api/profile/me")
-async def create_or_update_profile(profile_data: ProfileUpdate, wallet_address: str = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def 352
+(profile_data: ProfileUpdate, wallet_address: str = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """
     Create or update user's profile
     Requires valid JWT token
@@ -374,7 +375,7 @@ async def create_or_update_profile(profile_data: ProfileUpdate, wallet_address: 
         else:
             # Create new profile
             profile = Profile(
-                user_id=user.id,
+                user_id=user.wallet_address,
                 nickname=profile_data.nickname,
                 age=profile_data.age,
                 city=profile_data.city,
