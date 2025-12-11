@@ -9,8 +9,7 @@ class User(Base):
 
     wallet_address = Column(String, primary_key=True, index=True, unique=True)
     username = Column(String, nullable=True)
-        telegram_id = Column(Integer, nullable=True, index=True)
-
+    telegram_id = Column(Integer, nullable=True, index=True)
     # Pola profilu
     name = Column(String, default="")
     age = Column(String, default="")
