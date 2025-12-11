@@ -94,7 +94,102 @@ const MatchCard = ({ match, onJoin, isWalletConnected }) => {
   );
 };
 
-const ProfileView = ({ telegramId }) => {
+const ProfileView = () => {
+  const [profile, setProfile] = useState(null);
+  const [formData, setFormData] = useState({ nickname: '', age: '', city: '', skill_level: '', preferred_position: '', bio: '', phone: '' });
+  const [status, setStatus] = useState('');
+  const wallet = useTonWallet();
+  
+  useEffect(() => {
+    if (!wallet) return;
+    const fetchProfile = async () => {
+      try {
+        const response = await axios.get(`${API_URL}/api/profile/me`, {
+          headers: { 'Authorization': `Bearer ${wallet.account.address}` }
+        });
+        if (response.data.profile) {
+          setProfile(response.data.profile);
+          setFormData(response.data.profile);
+        }
+      } catch (e) { console.error(e); }
+    };
+    fetchProfile();
+  }, [wallet]);
+  
+  const handleChange = (e) => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+  
+  const handleSave = async () => {
+    setStatus('saving');
+    try {
+      const response = await axios.post(`${API_URL}/api/profile/me`, formData, {
+        headers: { 'Authorization': `Bearer ${wallet.account.address}` }
+      });
+      if (response.data.status === 'success') {
+        setProfile(response.data.profile);
+        setStatus('saved');
+        setTimeout(() => setStatus(''), 3000);
+      }
+    } catch (e) { setStatus('error'); }
+  };
+  
+  return (
+    <div className="p-6 pb-32">
+      <div className="flex flex-col items-center mb-10">
+        <div className="w-32 h-32 bg-gray-50 dark:bg-[#2C2C2C] rounded-full mb-6 relative border-4 border-white dark:border-[#2C2C2C] shadow-xl flex items-center justify-center overflow-hidden">
+          <User size={48} className="text-gray-300 dark:text-white/20" />
+          <div className="absolute bottom-1 right-1 bg-babyBlue dark:bg-babyOrange p-3 rounded-full text-white dark:text-black shadow-lg cursor-pointer hover:scale-110 transition-transform">
+            <Camera size={18} strokeWidth={2.5} />
+          </div>
+        </div>
+        <h2 className="text-3xl font-black text-gray-900 dark:text-white tracking-tight">Twój Profil</h2>
+        <p className="text-gray-400 text-base mt-1 font-medium">Uzupełnij dane gracza</p>
+      </div>
+      <div className="space-y-6">
+        {[
+          { l: 'Nick gracza', k: 'nickname' },
+          { l: 'Wiek', k: 'age', n: true },
+          { l: 'Miasto', k: 'city' },
+          { l: 'Poziom (beginner/intermediate/advanced)', k: 'skill_level' },
+          { l: 'Pozycja (G/F/C)', k: 'preferred_position' },
+          { l: 'Bio', k: 'bio' },
+          { l: 'Numer telefonu', k: 'phone' }
+        ].map((field) => (
+          <div key={field.k}>
+            <label className="block text-xs font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-2.5 ml-1">
+              {field.l}
+            </label>
+            <input
+              name={field.k}
+              value={formData[field.k] || ''}
+              onChange={handleChange}
+              type={field.n ? 'number' : 'text'}
+              className="w-full p-4 rounded-2xl bg-gray-50 dark:bg-[#2C2C2C] border-2 border-transparent focus:bg-white dark:focus:bg-[#2C2C2C] focus:border-babyBlue dark:focus:border-babyOrange text-gray-900 dark:text-white placeholder-gray-300 dark:placeholder-gray-600 outline-none transition-all font-semibold text-lg"
+              placeholder="..."
+            />
+          </div>
+        ))}
+      </div>
+      <button
+        onClick={handleSave}
+        disabled={status === 'saving'}
+        className={`w-full mt-10 font-bold py-4.5 rounded-2xl shadow-xl transition-all duration-300 text-lg ${
+          status === 'saved' ? 'bg-green-500 text-white shadow-green-500/20' :
+          status === 'error' ? 'bg-red-500 text-white shadow-red-500/20' :
+          'bg-babyBlue text-white dark:bg-babyOrange dark:text-black shadow-babyBlue/30 dark:shadow-babyOrange/20 hover:-translate-y-1'
+        }`}
+      >
+        {status === 'saving' ? 'Zapisywanie...' :
+         status === 'saved' ? 'Zapisano ✓' :
+         status === 'error' ? 'Błąd (Sprawdź sieć)' : 'Zapisz Profil'}
+      </button>
+    </div>
+  );
+}
+130
+  96
+    99
+      96
+        = ({ telegramId }) => {
   const [formData, setFormData] = useState({ name: '', age: '', height: '', number: '', wallet_address: '' });
   const [status, setStatus] = useState('');
   const wallet = useTonWallet();
