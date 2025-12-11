@@ -12,7 +12,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
 # Importy lokalne
 from database import engine, Base, get_db
-from models import User, Match
+from models import User, Match, Profile
 from auth import create_access_token, verify_token, get_current_user
 
 # --- KONFIGURACJA BOTA ---
@@ -285,4 +285,125 @@ async def get_profile(wallet_address: str = Depends(get_current_user), db: Async
             }
         }
     except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+                    
+# ===== PROFILE ENDPOINTS =====
+
+class ProfileUpdate(BaseModel):
+    nickname: str | None = None
+    age: int | None = None
+    city: str | None = None
+    skill_level: str | None = None  # beginner, intermediate, advanced
+    preferred_position: str | None = None  # G, F, C
+    bio: str | None = None
+    phone: str | None = None
+
+
+@app.get("/api/profile/me")
+async def get_profile(wallet_address: str = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """
+    Get current user's profile
+    Requires valid JWT token
+    """
+    try:
+        # Get user with profile
+        result = await db.execute(select(User).where(User.wallet_address == wallet_address))
+        user = result.scalar_one_or_none()
+        
+        if not user:
+            return {"status": "error", "message": "User not found"}
+        
+        profile = user.profile
+        
+        if not profile:
+            return {"status": "success", "profile": None}
+        
+        return {
+            "status": "success",
+            "profile": {
+                "id": profile.id,
+                "nickname": profile.nickname,
+                "age": profile.age,
+                "city": profile.city,
+                "skill_level": profile.skill_level,
+                "preferred_position": profile.preferred_position,
+                "bio": profile.bio,
+                "phone": profile.phone,
+                "created_at": profile.created_at.isoformat(),
+                "updated_at": profile.updated_at.isoformat()
+            }
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@app.post("/api/profile/me")
+async def create_or_update_profile(profile_data: ProfileUpdate, wallet_address: str = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """
+    Create or update user's profile
+    Requires valid JWT token
+    """
+    try:
+        # Get user
+        result = await db.execute(select(User).where(User.wallet_address == wallet_address))
+        user = result.scalar_one_or_none()
+        
+        if not user:
+            return {"status": "error", "message": "User not found"}
+        
+        # Check if profile exists
+        if user.profile:
+            # Update existing profile
+            profile = user.profile
+            if profile_data.nickname is not None:
+                profile.nickname = profile_data.nickname
+            if profile_data.age is not None:
+                profile.age = profile_data.age
+            if profile_data.city is not None:
+                profile.city = profile_data.city
+            if profile_data.skill_level is not None:
+                profile.skill_level = profile_data.skill_level
+            if profile_data.preferred_position is not None:
+                profile.preferred_position = profile_data.preferred_position
+            if profile_data.bio is not None:
+                profile.bio = profile_data.bio
+            if profile_data.phone is not None:
+                profile.phone = profile_data.phone
+        else:
+            # Create new profile
+            profile = Profile(
+                user_id=user.id,
+                nickname=profile_data.nickname,
+                age=profile_data.age,
+                city=profile_data.city,
+                skill_level=profile_data.skill_level,
+                preferred_position=profile_data.preferred_position,
+                bio=profile_data.bio,
+                phone=profile_data.phone
+            )
+            db.add(profile)
+        
+        await db.commit()
+        await db.refresh(profile)
+        
+        return {
+            "status": "success",
+            "message": "Profile saved successfully",
+            "profile": {
+                "id": profile.id,
+                "nickname": profile.nickname,
+                "age": profile.age,
+                "city": profile.city,
+                "skill_level": profile.skill_level,
+                "preferred_position": profile.preferred_position,
+                "bio": profile.bio,
+                "phone": profile.phone,
+                "created_at": profile.created_at.isoformat(),
+                "updated_at": profile.updated_at.isoformat()
+            }
+        }
+    except Exception as e:
+        await db.rollback()
         return {"status": "error", "message": str(e)}
