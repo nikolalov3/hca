@@ -339,7 +339,7 @@ async def get_profile(wallet_address: str = Depends(get_current_user), db: Async
 
 
 @app.post("/api/profile/me")
-async def 352
+async def update_profile_me
 (profile_data: ProfileUpdate, wallet_address: str = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """
     Create or update user's profile
