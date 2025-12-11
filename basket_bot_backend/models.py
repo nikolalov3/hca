@@ -23,6 +23,7 @@ class User(Base):
     # Relationship
     matches_created = relationship("Match", back_populates="organizer")
     matches_joined = relationship("MatchParticipant", back_populates="user")
+        profile = relationship("Profile", back_populates="user", uselist=False)
 
 
 class Match(Base):
@@ -57,3 +58,26 @@ class MatchParticipant(Base):
     # Relationships
     match = relationship("Match", back_populates="participants")
     user = relationship("User", back_populates="matches_joined")
+
+
+class Profile(Base):
+    __tablename__ = "profiles"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True, index=True)
+    
+    # Dane profilu
+    nickname = Column(String, nullable=True)  # Nick gracza
+    age = Column(Integer, nullable=True)  # Wiek
+    city = Column(String, nullable=True)  # Miasto
+    skill_level = Column(String, nullable=True)  # Poziom umiejętności (beginner, intermediate, advanced)
+    preferred_position = Column(String, nullable=True)  # Preferowana pozycja (G, F, C)
+    bio = Column(String, nullable=True)  # Opis/biografia
+    phone = Column(String, nullable=True)  # Numer telefonu
+    
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationship
+    user = relationship("User", back_populates="profile")
