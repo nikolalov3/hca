@@ -17,7 +17,7 @@ if raw_url:
         DATABASE_URL = raw_url
 else:
     # Fallback tylko dla lokalnych testów
-    DATABASE_URL = "sqlite+aiosqlite:///./hoop.db"
+    DATABASE_URL = "sqlite+aiosqlite:///./hoop_clean.db"
 
 print(f"DEBUG: Łączę z bazą: {DATABASE_URL.split('@')[0]}...") # Loguje początek adresu dla pewności
 
