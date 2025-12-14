@@ -11,9 +11,9 @@ from telegram import Update, WebAppInfo, InlineKeyboardButton, InlineKeyboardMar
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
 # Importy lokalne
-from database import engine, Base, get_db
-from models import User, Match, Profile
-from auth import create_access_token, verify_token, get_current_user
+from .database import engine, Base, get_db
+from .models import User, Match, Profile
+from .auth import create_access_token, verify_token, get_current_user
 
 # --- KONFIGURACJA BOTA ---
 TOKEN = os.getenv("BOT_TOKEN") or os.getenv("TELEGRAM_BOT_TOKEN")
