@@ -384,7 +384,6 @@ profile_data: ProfileUpdate, wallet_address: str = Depends(get_current_user), db
                 phone=profile_data.phone
             )
             db.add(profile)
-                user.profile = profile  # Set backref relationship
         
         await db.commit()
         await db.refresh(profile)
