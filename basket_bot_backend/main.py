@@ -388,7 +388,7 @@ profile_data: ProfileUpdate, wallet_address: str = Depends(get_current_user), db
         
         await db.commit()
         await db.refresh(profile)
-                await db.refresh(user)
+                
         
         return {
             "status": "success",
