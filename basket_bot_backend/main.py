@@ -484,4 +484,3 @@ async def save_profile_telegram(request: Request, db: AsyncSession = Depends(get
         return {"ok": True}
     return {"ok": True}                           
                         
-    }
