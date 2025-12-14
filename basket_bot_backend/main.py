@@ -375,7 +375,7 @@ profile_data: ProfileUpdate, wallet_address: str = Depends(get_current_user), db
             # Create new profile
             profile = Profile(
                 user_id=user.wallet_address,
-                nickname=pprofile_data.nickname ,
+                nickname=profile_data.nickname ,
                 age=profile_data.age,
                 city=profile_data.city,
                 skill_level=profile_data.skill_level,
