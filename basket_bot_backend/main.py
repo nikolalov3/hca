@@ -408,3 +408,86 @@ profile_data: ProfileUpdate, wallet_address: str = Depends(get_current_user), db
     except Exception as e:
         await db.rollback()
         return {"status": "error", "message": str(e)}
+
+
+# --- SIMPLIFIED PROFILE ENDPOINT (za telegram_id bez JWT) ---
+@app.post("/api/profile/telegram")
+async def save_profile_telegram(request: Request, db: AsyncSession = Depends(get_db)):
+    """
+    Zapisz profil użytkownika przy użyciu telegram_id (bez JWT)
+    """
+    try:
+        data = await request.json()
+    except:
+        return {"status": "error", "message": "Błąd JSON"}
+    
+    telegram_id = data.get("telegram_id")
+    if not telegram_id:
+        return {"status": "error", "message": "Brak telegram_id"}
+    
+    try:
+        tg_id = int(telegram_id)
+    except:
+        return {"status": "error", "message": "telegram_id musi być liczbą"}
+    
+    # Szukaj użytkownika
+    result = await db.execute(select(User).where(User.telegram_id == tg_id))
+    user = result.scalar_one_or_none()
+    
+    if not user:
+        # Utwórz nowego użytkownika bez wallet_address
+        user = User(telegram_id=tg_id, wallet_address=f"tg_{tg_id}")
+        db.add(user)
+        await db.flush()
+    
+    # Szukaj profilu
+    profile_result = await db.execute(select(Profile).where(Profile.user_id == user.wallet_address))
+    profile = profile_result.scalar_one_or_none()
+    
+    if not profile:
+        # Utwórz nowy profil
+        profile = Profile(
+            user_id=user.wallet_address,
+            nickname=data.get("nickname"),
+            age=data.get("age"),
+            city=data.get("city"),
+            skill_level=data.get("skill_level"),
+            preferred_position=data.get("preferred_position"),
+            bio=data.get("bio"),
+            phone=data.get("phone")
+        )
+        db.add(profile)
+    else:
+        # Aktualizuj istniejący profil
+        if data.get("nickname"):
+            profile.nickname = data.get("nickname")
+        if data.get("age"):
+            profile.age = data.get("age")
+        if data.get("city"):
+            profile.city = data.get("city")
+        if data.get("skill_level"):
+            profile.skill_level = data.get("skill_level")
+        if data.get("preferred_position"):
+            profile.preferred_position = data.get("preferred_position")
+        if data.get("bio"):
+            profile.bio = data.get("bio")
+        if data.get("phone"):
+            profile.phone = data.get("phone")
+    
+    await db.commit()
+    await db.refresh(profile)
+    
+    return {
+        "status": "success",
+        "message": "Profil zapisany!",
+        "profile": {
+            "id": profile.id,
+            "nickname": profile.nickname,
+            "age": profile.age,
+            "city": profile.city,
+            "skill_level": profile.skill_level,
+            "preferred_position": profile.preferred_position,
+            "bio": profile.bio,
+            "phone": profile.phone
+        }
+    }
