@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from contextlib import asynccontextmanager
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, Update
-
+# Importy lokalne
 from .database import engine, Base, get_db
 from .models import User, Match, Profile
 from .auth import create_access_token, verify_token, get_current_user
