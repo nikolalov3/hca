@@ -301,7 +301,7 @@ class ProfileUpdate(BaseModel):
 
 
 @app.get("/api/profile/me")
-119(wallet_address: str = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def get_profile(wallet_address: str = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """
     Get current user's profile
     Requires valid JWT token
