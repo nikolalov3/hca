@@ -116,7 +116,7 @@ async def get_matches():
     ]
 
 @app.get("/api/profile/{telegram_id}")
-async def get_profile(telegram_id: int, db: AsyncSession = Depends(get_db)):
+async def get_user_profile(telegram_id: int, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.telegram_id == telegram_id))
     user = result.scalar_one_or_none()
     
@@ -263,7 +263,7 @@ async def login(request: LoginRequest, db: AsyncSession = Depends(get_db)):
         return {"status": "error", "message": str(e)}
 
 @app.get("/api/auth/me")
-async def get_profile(wallet_address: str = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def get_auth_profile(wallet_address: str = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """
     Get current user profile
     Requires valid JWT token
@@ -301,7 +301,7 @@ class ProfileUpdate(BaseModel):
 
 
 @app.get("/api/profile/me")
-async def get_profile(wallet_address: str = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+119(wallet_address: str = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """
     Get current user's profile
     Requires valid JWT token
