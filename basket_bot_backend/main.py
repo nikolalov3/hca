@@ -157,7 +157,7 @@ async def create_match(request: Request, db: AsyncSession = Depends(get_db)):
         crowdfund_amount=int(crowdfund_amount),
         slots_needed=int(slots_needed),
         current_players=1,
-        organizer_id=int(tg_id)
+        organizer_wallet=str(tg_id)
     )
     db.add(new_match)
     await db.commit()
@@ -185,7 +185,7 @@ async def get_all_matches(db: AsyncSession = Depends(get_db)):
             "slots_needed": m.slots_needed,
             "current_players": m.current_players,
             "slots_available": m.slots_needed - m.current_players,
-            "organizer_id": m.organizer_id
+            "organizer_wallet": m.organizer_wallet
         }
         for m in matches
     ]
