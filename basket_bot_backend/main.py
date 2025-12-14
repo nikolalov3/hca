@@ -477,10 +477,10 @@ async def save_profile_telegram(request: Request, db: AsyncSession = Depends(get
         # --- TELEGRAM WEBHOOK HANDLER ---
         @app.post("/telegram")
         async def handle_telegram_update(update: dict):
-                try:
-                            print(f"Received Telegram update: {update}")
-                            return {"ok": True}
-                        except Exception as e:
-                                    print(f"Webhook error: {e}")
-                                    return {"ok": False, "error": str(e)}
+    if update.get("message") and update["message"].get("text") == "/start":
+        user_id = update["message"]["from"]["id"]
+        print(f"User {user_id} sent /start command")
+        return {"ok": True}
+    return {"ok": True}                            print(f"Received Telegram update: {update}")                            return {"ok": True}
+                        
     }
