@@ -475,12 +475,12 @@ async def save_profile_telegram(request: Request, db: AsyncSession = Depends(get
         }
         }
 
-        # --- TELEGRAM WEBHOOK HANDLER ---
-        @app.post("/telegram")
+        # --- TELEGRAM WEBHOOK HANDLER        
+    @app.post("/telegram")
         async def handle_telegram_update(update: dict):
-    if update.get("message") and update["message"].get("text") == "/start":
-        user_id = update["message"]["from"]["id"]
-        print(f"User {user_id} sent /start command")
-        return {"ok": True}
-    return {"ok": True}                           
+        if update.get("message") and update["message"].get("text") == "/start":
+            user_id = update["message"]["from"]["id"]
+            print(f"User {user_id} sent /start command")
+            return {"ok": True}
+        return {"ok": True}                           
                         
