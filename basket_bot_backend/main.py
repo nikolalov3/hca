@@ -47,15 +47,15 @@ async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     # Start Bota
-    bot_app = await start_bot()
+#     bot_app = await start_bot()
     
     yield
     
     # Stop Bota
-    if bot_app:
-        await bot_app.updater.stop()
-        await bot_app.stop()
-        await bot_app.shutdown()
+#     if bot_app:
+#         await bot_app.updater.stop()
+#         await bot_app.stop()
+#         await bot_app.shutdown()
 
 app = FastAPI(lifespan=lifespan)
 
