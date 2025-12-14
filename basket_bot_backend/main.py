@@ -473,6 +473,7 @@ async def save_profile_telegram(request: Request, db: AsyncSession = Depends(get
             "bio": profile.bio,
             "phone": profile.phone
         }
+        }
 
         # --- TELEGRAM WEBHOOK HANDLER ---
         @app.post("/telegram")
@@ -481,6 +482,6 @@ async def save_profile_telegram(request: Request, db: AsyncSession = Depends(get
         user_id = update["message"]["from"]["id"]
         print(f"User {user_id} sent /start command")
         return {"ok": True}
-    return {"ok": True}                            print(f"Received Telegram update: {update}")                            return {"ok": True}
+    return {"ok": True}                           
                         
     }
