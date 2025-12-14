@@ -7,10 +7,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from contextlib import asynccontextmanager
-from telegram import Update, WebAppInfo, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
-
-# Importy lokalne
+ Importy lokalne
 from .database import engine, Base, get_db
 from .models import User, Match, Profile
 from .auth import create_access_token, verify_token, get_current_user
@@ -26,28 +24,13 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
-async def start_bot():
-    if not TOKEN:
-        print("⚠️ BRAK TOKENU BOTA!")
-        return None
     
-    app_bot = ApplicationBuilder().token(TOKEN).build()
-    app_bot.add_handler(CommandHandler("start", start_command))
-    
-    await app_bot.initialize()
-    await app_bot.start()
-    await app_bot.updater.start_polling()
-    print("✅ Bot wystartował!")
-    return app_bot
-
 # --- LIFESPAN ---
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Start Bazy
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    # Start Bota
-#     bot_app = await start_bot()
     
     yield
     
