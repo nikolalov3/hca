@@ -1,6 +1,7 @@
 import os
 import asyncio
 import json
+import requests
 from pydantic import BaseModel
 from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -481,6 +482,10 @@ async def save_profile_telegram(request: Request, db: AsyncSession = Depends(get
         if update.get("message") and update["message"].get("text") == "/start":
             user_id = update["message"]["from"]["id"]
             print(f"User {user_id} sent /start command")
+            bot_token = os.getenv("BOT_TOKEN")
+            url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+            requests.post(url, json={"chat_id": user_id, "text": "Siema! Bot działa! 🎉"})
+
             return {"ok": True}
         return {"ok": True}                           
                         
